@@ -6,7 +6,7 @@ const socket_io_1 = require("socket.io");
 const initSocketServer = (server) => {
     const io = new socket_io_1.Server(server, {
         cors: {
-            origin: process.env.ORIGIN || "http://localhost:3000",
+            origin: ["https://testing-george.vercel.app"],
             methods: ["GET", "POST"],
             credentials: true
         }

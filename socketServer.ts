@@ -5,7 +5,7 @@ import http from 'http';
 export const initSocketServer = (server: http.Server) => {
     const io = new SocketIOServer(server, {
         cors: {
-            origin: process.env.ORIGIN || "http://localhost:3000",
+            origin: ["https://testing-george.vercel.app"],
             methods: ["GET", "POST"],
             credentials: true
         }

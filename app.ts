@@ -15,7 +15,7 @@ app.use(express.json({limit: "50mb"}))
 //cookie parser
 // CORS - Cross-Origin Resource Sharing
 app.use(cors({
-    origin: process.env.FRONTEND_URL,
+    origin: ['https://testing-george.vercel.app'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -23,7 +23,12 @@ app.use(cors({
     maxAge: 600
 }));
 
-app.use(helmet());
+app.use(
+    helmet({
+        crossOriginResourcePolicy: { policy: "cross-origin" },
+        crossOriginOpenerPolicy: { policy: "same-origin" }
+    })
+);
 app.use(helmet.noSniff());
 app.use(helmet.xssFilter());
 app.use(helmet.hidePoweredBy());
