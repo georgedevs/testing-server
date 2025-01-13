@@ -119,20 +119,25 @@ const clearTokens = async (userId, res) => {
         const userIdString = userId.toString();
         // Clear Redis session
         await redis_1.redis.del(`user_${userIdString}`);
-        const cookieOptions = {
+        // Clear cookies by setting them to empty and expiring them immediately
+        res.cookie("access_token", "", {
+            maxAge: 1,
             httpOnly: true,
             secure: true,
             sameSite: 'none',
-            path: '/',
-            domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined,
-            maxAge: 0
-        };
-        // Clear cookies
-        res.cookie("access_token", "", { maxAge: 1 });
-        res.cookie("refresh_token", "", { maxAge: 1 });
+            expires: new Date(0)
+        });
+        res.cookie("refresh_token", "", {
+            maxAge: 1,
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none',
+            expires: new Date(0)
+        });
+        return true;
     }
     catch (error) {
-        throw new Error("Error clearing tokens: " + error);
+        throw new Error("Error clearing tokens: " + error.message);
     }
 };
 exports.clearTokens = clearTokens;
