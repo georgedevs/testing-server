@@ -15,13 +15,11 @@ app.use(express.json({limit: "50mb"}))
 //cookie parser
 // CORS - Cross-Origin Resource Sharing
 app.use(cors({
-    origin: process.env.NODE_ENV === 'production' 
-        ? ['https://testing-george.vercel.app']
-        : 'http://localhost:3000',
+    origin: ['https://testing-george.vercel.app'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
-    exposedHeaders: ['Set-Cookie'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['set-cookie'],
     maxAge: 600
 }));
 
