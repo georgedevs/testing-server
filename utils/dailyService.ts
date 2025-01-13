@@ -19,22 +19,42 @@ class DailyService {
     };
   }
 
-  async createRoom(meetingId: string, scheduledTime: Date, durationMinutes: number = 45) {
+  private ensureUTCDate(date: Date | string): Date {
+    let utcDate: Date;
+    
+    if (typeof date === 'string') {
+      // If it's a string, create a new Date object
+      utcDate = new Date(date);
+    } else {
+      utcDate = date;
+    }
+    
+    // Create a new UTC date using the UTC timestamp
+    return new Date(Date.UTC(
+      utcDate.getUTCFullYear(),
+      utcDate.getUTCMonth(),
+      utcDate.getUTCDate(),
+      utcDate.getUTCHours(),
+      utcDate.getUTCMinutes(),
+      utcDate.getUTCSeconds()
+    ));
+  }
+
+  async createRoom(meetingId: string, scheduledTime: Date | string, durationMinutes: number = 45) {
     try {
-      // Convert scheduledTime to UTC timestamp
-      const meetingStartTime = new Date(scheduledTime).getTime();
+      const utcScheduledTime = this.ensureUTCDate(scheduledTime);
       
       // Calculate room expiration - 24 hours after scheduled meeting end time
-      const meetingEndTime = addMinutes(new Date(meetingStartTime), durationMinutes);
+      const meetingEndTime = addMinutes(utcScheduledTime, durationMinutes);
       const roomExpiration = Math.floor(addDays(meetingEndTime, 1).getTime() / 1000);
       
-      // Allow access 10 minutes before scheduled time
-      const nbfTime = Math.floor(addMinutes(new Date(meetingStartTime), -10).getTime() / 1000);
+      // Calculate when meeting should start (5 minutes before scheduled time)
+      const nbfTime = Math.floor(addMinutes(utcScheduledTime, -5).getTime() / 1000);
 
       console.log('Creating room with times:', {
-        scheduledTime: scheduledTime.toISOString(),
+        scheduledTime: utcScheduledTime.toISOString(),
         nbfTime: new Date(nbfTime * 1000).toISOString(),
-        expiration: new Date(roomExpiration * 1000).toISOString()
+        expirationTime: new Date(roomExpiration * 1000).toISOString()
       });
 
       const response = await axios.post(
@@ -66,20 +86,19 @@ class DailyService {
     }
   }
 
-  async createMeetingToken(roomName: string, isClient: boolean, scheduledTime: Date, durationMinutes: number = 45) {
+  async createMeetingToken(roomName: string, isClient: boolean, scheduledTime: Date | string, durationMinutes: number = 45) {
     try {
-      // Convert scheduledTime to UTC timestamp
-      const meetingStartTime = new Date(scheduledTime).getTime();
+      const utcScheduledTime = this.ensureUTCDate(scheduledTime);
       
       // Token expires 24 hours after meeting end time
-      const meetingEndTime = addMinutes(new Date(meetingStartTime), durationMinutes);
+      const meetingEndTime = addMinutes(utcScheduledTime, durationMinutes);
       const tokenExpiration = Math.floor(addDays(meetingEndTime, 1).getTime() / 1000);
     
-      // Allow access 10 minutes before meeting
-      const tokenStartTime = Math.floor(addMinutes(new Date(meetingStartTime), -10).getTime() / 1000);
+      // Token becomes valid 5 minutes before meeting
+      const tokenStartTime = Math.floor(addMinutes(utcScheduledTime, -5).getTime() / 1000);
 
       console.log('Creating token with times:', {
-        scheduledTime: scheduledTime.toISOString(),
+        scheduledTime: utcScheduledTime.toISOString(),
         tokenStartTime: new Date(tokenStartTime * 1000).toISOString(),
         tokenExpiration: new Date(tokenExpiration * 1000).toISOString()
       });
