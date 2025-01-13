@@ -20,14 +20,14 @@ exports.accessTokenOptions = {
     maxAge: accessTokenExpire * 60 * 1000,
     httpOnly: true,
     sameSite: 'none',
-    secure: process.env.NODE_ENV === 'production',
+    secure: true,
 };
 exports.refreshTokenOptions = {
     expires: new Date(Date.now() + refreshTokenExpire * 60 * 1000),
     maxAge: refreshTokenExpire * 60 * 1000,
     httpOnly: true,
     sameSite: 'none',
-    secure: process.env.NODE_ENV === 'production',
+    secure: true,
 };
 // Token generation functions
 const generateAccessToken = (user) => {

@@ -44,7 +44,7 @@ export const accessTokenOptions: ITokenOptions = {
     maxAge: accessTokenExpire * 60 * 1000,
     httpOnly: true,
     sameSite: 'none',
-    secure: process.env.NODE_ENV === 'production',
+    secure: true,
 };
 
 export const refreshTokenOptions: ITokenOptions = {
@@ -52,7 +52,7 @@ export const refreshTokenOptions: ITokenOptions = {
     maxAge: refreshTokenExpire * 60 * 1000,
     httpOnly: true,
     sameSite: 'none',
-    secure: process.env.NODE_ENV === 'production',
+    secure: true,
 };
 
 // Token generation functions
@@ -168,7 +168,7 @@ export const clearTokens = async (userId: string | Types.ObjectId, res: Response
         
         // Clear cookies
         res.cookie("access_token", "", { maxAge: 1 });
-        res.cookie("refresh_token", "", { maxAge: 1 });
+        res.cookie("refresh_token", "", { maxAge: 1 }); 
     } catch (error) {
         throw new Error("Error clearing tokens: " + error);
     }
