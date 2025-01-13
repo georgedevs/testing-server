@@ -16,7 +16,7 @@ const getDiceBearUrl = (style: string, seed: string, options: Record<string, any
 };
 
 // Avatar configuration using DiceBear
-export const avatarOptions = {
+export const avatarOptions: Record<AvatarCategory, AvatarOption[]> = {
   male: [
     {
       id: 'male-personas-professional',

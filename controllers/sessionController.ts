@@ -76,7 +76,6 @@ export const startSession = CatchAsyncError(
       process.env.TWILIO_API_SECRET!
     );
 
-    token.identity = userId.toString();
 
     // Grant access to Video
     const videoGrant = new VideoGrant({

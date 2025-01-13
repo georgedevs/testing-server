@@ -1,4 +1,3 @@
-// utils/avatar.ts
 import { redis } from "./redis";
 import { 
   avatarOptions, 
@@ -12,10 +11,13 @@ interface CachedAvatarData {
   lastUpdated: number;
 }
 
-
+/**
+ * Gets all avatars across all categories
+ */
 export const getAllAvatars = (): AvatarOption[] => {
-  const allAvatars: AvatarOption[] = Object.values(avatarOptions).reduce(
-    (acc: AvatarOption[], categoryAvatars) => [...acc, ...categoryAvatars],
+  // Explicitly type the accumulator and current value for type safety
+  const allAvatars = (Object.values(avatarOptions) as AvatarOption[][]).reduce<AvatarOption[]>(
+    (acc, categoryAvatars) => [...acc, ...categoryAvatars],
     []
   );
   return allAvatars;
@@ -57,9 +59,13 @@ export const validateAvatarId = async (avatarId: string): Promise<boolean> => {
   }
 };
 
-export const clearAvatarCache = async () => {
+/**
+ * Clears the avatar cache in Redis
+ */
+export const clearAvatarCache = async (): Promise<void> => {
   await redis.del('valid_avatars');
 };
+
 /**
  * Gets detailed information about a specific avatar
  */
@@ -94,3 +100,11 @@ export const isAvatarInCategory = (
 ): boolean => {
   return avatarOptions[category].some(avatar => avatar.id === avatarId);
 };
+
+// Export interface for use in other files
+export interface IAvatarOption {
+  id: string;
+  label: string;
+  category: AvatarCategory; // Using the imported AvatarCategory type
+  imageUrl: string;
+}
