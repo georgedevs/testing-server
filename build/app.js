@@ -13,13 +13,13 @@ const userRoute_1 = __importDefault(require("./routes/userRoute"));
 const avatarRoute_1 = __importDefault(require("./routes/avatarRoute"));
 const bookingRoute_1 = __importDefault(require("./routes/bookingRoute"));
 const sessionRoute_1 = __importDefault(require("./routes/sessionRoute"));
+const helmet_1 = __importDefault(require("helmet"));
 //body parser
 exports.app.use(express_1.default.json({ limit: "50mb" }));
-exports.app.set('trust proxy', 1);
 //cookie parser
 // CORS - Cross-Origin Resource Sharing
 exports.app.use((0, cors_1.default)({
-    origin: 'https://testing-george.vercel.app',
+    origin: ['https://testing-george.vercel.app'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
@@ -28,11 +28,17 @@ exports.app.use((0, cors_1.default)({
 }));
 exports.app.use((req, res, next) => {
     res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
     next();
 });
+exports.app.use((0, helmet_1.default)({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginOpenerPolicy: { policy: "same-origin" }
+}));
+exports.app.use(helmet_1.default.noSniff());
+exports.app.use(helmet_1.default.xssFilter());
+exports.app.use(helmet_1.default.hidePoweredBy());
 exports.app.use((0, cookie_parser_1.default)());
-exports.app.use(express_1.default.json());
+exports.app.set('trust proxy', 1);
 //routes
 exports.app.use("/api/v1", userRoute_1.default);
 exports.app.use("/api/v1", avatarRoute_1.default);

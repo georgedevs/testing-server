@@ -12,12 +12,10 @@ import helmet from "helmet";
 //body parser
 app.use(express.json({limit: "50mb"}))
 
-app.set('trust proxy', 1);
-
 //cookie parser
 // CORS - Cross-Origin Resource Sharing
 app.use(cors({
-    origin: 'https://testing-george.vercel.app',
+    origin: ['https://testing-george.vercel.app'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
@@ -27,18 +25,24 @@ app.use(cors({
 
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Credentials', 'true');
-    res.header(
-        'Access-Control-Allow-Headers',
-        'Origin, X-Requested-With, Content-Type, Accept'
-    );
     next();
 });
 
 
+app.use(
+    helmet({
+        crossOriginResourcePolicy: { policy: "cross-origin" },
+        crossOriginOpenerPolicy: { policy: "same-origin" }
+    })
+);
+app.use(helmet.noSniff());
+app.use(helmet.xssFilter());
+app.use(helmet.hidePoweredBy());
+
 
 app.use(cookieParser());
 
-app.use(express.json());
+app.set('trust proxy', 1);
 
 //routes
 app.use("/api/v1", userRouter)
