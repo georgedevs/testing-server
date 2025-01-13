@@ -530,7 +530,7 @@ exports.getMeetingToken = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, re
     const currentTime = new Date();
     const timeDifference = meetingDateTime.getTime() - currentTime.getTime();
     const minutesBeforeMeeting = timeDifference / (1000 * 60);
-    if (minutesBeforeMeeting > 60n) {
+    if (minutesBeforeMeeting > 5) {
         return next(new errorHandler_1.default('Meeting room is not yet available. Please join 5 minutes before the scheduled time.', 400));
     }
     if (minutesBeforeMeeting < -meeting.meetingDuration) {
