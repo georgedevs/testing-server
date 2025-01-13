@@ -11,7 +11,7 @@
     "dev": "ts-node-dev --respawn --transpile-only server.ts",
     "start": "node build/server.js",
     
-    "build": "tsc"
+     "build": "tsc && xcopy /E /I mails build\\mails"
   },
   "author": "Ukoh-Godwin George",
   "license": "ISC",

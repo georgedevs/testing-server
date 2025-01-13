@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Meeting Time Selected</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <style type="text/css">
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        body {
+            margin: 0;
+            padding: 0;
+            min-width: 100%;
+            font-family: 'Inter', Arial, sans-serif;
+            font-size: 16px;
+            line-height: 1.6;
+            background-color: #f5f5f5;
+            color: #1a1a1a;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .email-wrapper {
+            max-width: 600px;
+            margin: 40px auto;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .email-header {
+            background: linear-gradient(135deg, #0070f3 0%, #00a6ff 100%);
+            padding: 40px 24px;
+            text-align: center;
+        }
+
+        h2 {
+            color: #ffffff;
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .email-body {
+            padding: 40px 32px;
+            background-color: #ffffff;
+        }
+
+        .meeting-details {
+            background-color: #f5f7fa;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 24px 0;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        li {
+            padding: 8px 0;
+        }
+
+        @media only screen and (max-width: 480px) {
+            .email-wrapper {
+                margin: 0;
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-header">
+            <h2>Client Selected Meeting Time</h2>
+        </div>
+        <div class="email-body">
+            <p>A client has selected a meeting time:</p>
+            <div class="meeting-details">
+                <ul>
+                    <li><strong>Date:</strong> <%= meetingDate %></li>
+                    <li><strong>Time:</strong> <%= meetingTime %></li>
+                </ul>
+            </div>
+            <p>Please log in to accept or decline this meeting request within the next 15 hours.</p>
+        </div>
+    </div>
+</body>
+</html>

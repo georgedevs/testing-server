@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Alert</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .alert {
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .details {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #666666;
+        }
+    </style>
+</head>
+<body>
+    <div class="alert">
+        <h2>⚠️ Security Alert: Multiple Login Attempts Detected</h2>
+    </div>
+    
+    <p>Hello,</p>
+    
+    <p>We've detected multiple login attempts to your account that exceed our security thresholds.</p>
+    
+    <div class="details">
+        <h3>Details:</h3>
+        <p>• IP Address: <%= ip %></p>
+        <p>• Time: <%= new Date().toLocaleString() %></p>
+        <p>• Email: <%= email %></p>
+    </div>
+    
+    <p>If this was not you, we recommend:</p>
+    <ul>
+        <li>Changing your password immediately</li>
+        <li>Enabling two-factor authentication if not already enabled</li>
+        <li>Reviewing your recent account activity</li>
+    </ul>
+    
+    <p>If this was you, please note that multiple failed login attempts will result in temporary account lockouts for security purposes.</p>
+    
+    <div class="footer">
+        <p>This is an automated message. Please do not reply to this email.</p>
+        <p>If you need assistance, please contact our support team.</p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Counselor Assigned</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #1F2937;
+            margin: 0;
+            padding: 0;
+            background-color: #F3F4F6;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(to right, #7C3AED, #F97316);
+            color: white;
+            padding: 32px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .content {
+            padding: 32px 24px;
+            background-color: #ffffff;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #7C3AED;
+            color: white;
+            text-decoration: none;
+            border-radius: 9999px;
+            margin: 24px 0;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: background-color 0.3s ease;
+        }
+        .button:hover {
+            background-color: #6D28D9;
+        }
+        .info-box {
+            background-color: #F3F4F6;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 16px 0;
+        }
+        .footer {
+            text-align: center;
+            padding: 24px;
+            font-size: 12px;
+            color: #6B7280;
+            background-color: #F9FAFB;
+            border-top: 1px solid #E5E7EB;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Counselor Assigned</h1>
+        </div>
+        <div class="content">
+            <p>Great news! A counselor has been assigned to your request.</p>
+            <div class="info-box">
+                <p><strong>Counselor ID:</strong> <%= Math.floor(1000 + Math.random() * 9000) %></p>
+            </div>
+            <div style="text-align: center;">
+                <a href="#" class="button">Select Meeting Time</a>
+            </div>
+            <p>Please log in to select a meeting time from your counselor's available slots.</p>
+        </div>
+        <div class="footer">
+            <p>&copy; <%= new Date().getFullYear() %> MiCounselor. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

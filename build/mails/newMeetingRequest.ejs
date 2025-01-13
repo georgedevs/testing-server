@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>New Meeting Request</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <style type="text/css">
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        body {
+            margin: 0;
+            padding: 0;
+            min-width: 100%;
+            font-family: 'Inter', Arial, sans-serif;
+            font-size: 16px;
+            line-height: 1.6;
+            background-color: #f5f5f5;
+            color: #1a1a1a;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .email-wrapper {
+            max-width: 600px;
+            margin: 40px auto;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .email-header {
+            background: linear-gradient(135deg, #6c757d 0%, #8c98a4 100%);
+            padding: 40px 24px;
+            text-align: center;
+        }
+
+        h2 {
+            color: #ffffff;
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .email-body {
+            padding: 40px 32px;
+            background-color: #ffffff;
+        }
+
+        .meeting-details {
+            background-color: #f5f7fa;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 24px 0;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        li {
+            padding: 8px 0;
+        }
+
+        @media only screen and (max-width: 480px) {
+            .email-wrapper {
+                margin: 0;
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-header">
+            <h2>New Meeting Request Received</h2>
+        </div>
+        <div class="email-body">
+            <p>A new meeting request has been submitted:</p>
+            <div class="meeting-details">
+                <ul>
+                    <li><strong>Meeting Type:</strong> <%= meetingType %></li>
+                    <li><strong>Issue Description:</strong> <%= issueDescription %></li>
+                </ul>
+            </div>
+            <p>Please log in to the admin dashboard to assign a counselor.</p>
+        </div>
+    </div>
+</body>
+</html>

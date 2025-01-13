@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session Summary</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            background-color: #f8f9fa;
+        }
+        .content {
+            padding: 20px;
+        }
+        .summary-box {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>Session Summary</h2>
+    </div>
+    <div class="content">
+        <p>Hello,</p>
+        <p>Your counseling session has concluded. Here's a summary:</p>
+        <div class="summary-box">
+            <p><strong>Date:</strong> <%= session.startTime.toLocaleDateString() %></p>
+            <p><strong>Duration:</strong> <%= Math.floor(session.totalCallDuration / 60) %> minutes</p>
+            <% if (nextSession) { %>
+                <p><strong>Next Session:</strong> <%= nextSession.meetingDate.toLocaleDateString() %> at <%= nextSession.meetingTime %></p>
+            <% } %>
+        </div>
+        <p>Thank you for participating in the session.</p>
+        <% if (isClient) { %>
+            <p>If you need to schedule another session, you can do so through our platform.</p>
+        <% } %>
+    </div>
+    <div class="footer">
+        <p>This is an automated message, please do not reply.</p>
+    </div>
+</body>
+</html>
