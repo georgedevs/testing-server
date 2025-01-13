@@ -43,7 +43,7 @@ export const accessTokenOptions: ITokenOptions = {
     expires: new Date(Date.now() + accessTokenExpire * 60 * 1000),
     maxAge: accessTokenExpire * 60 * 1000,
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: 'none',
     secure: true,
 };
 
@@ -51,7 +51,7 @@ export const refreshTokenOptions: ITokenOptions = {
     expires: new Date(Date.now() + refreshTokenExpire * 60 * 1000),
     maxAge: refreshTokenExpire * 60 * 1000,
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: 'none',
     secure: true,
 };
 
@@ -172,7 +172,7 @@ export const clearTokens = async (userId: string | Types.ObjectId, res: Response
             maxAge: 1,
             httpOnly: true,
             secure: true,
-            sameSite: 'lax',
+            sameSite: 'none',
             expires: new Date(0)
         });
         
@@ -180,7 +180,7 @@ export const clearTokens = async (userId: string | Types.ObjectId, res: Response
             maxAge: 1,
             httpOnly: true,
             secure: true,
-            sameSite: 'lax',
+            sameSite: 'none',
             expires: new Date(0)
         });
 
