@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Session Reminder</title>
+</head>
+<body>
+    <h2>Session Reminder</h2>
+    <p>This is a reminder for your upcoming <%= type === 'client' ? 'counseling' : 'client' %> session.</p>
+    <p>Session starts at: <%= startTime.toLocaleString() %></p>
+    <p>Please ensure you:</p>
+    <ul>
+        <li>Have a stable internet connection</li>
+        <li>Are in a quiet, private space</li>
+        <li>Have tested your camera and microphone</li>
+        <li>Join the session 5 minutes early</li>
+    </ul>
+    <p>Click the link in your dashboard to join the session when it's time.</p>
+</body>
+</html>

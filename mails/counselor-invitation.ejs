@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Counselor Invitation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #1F2937;
+            margin: 0;
+            padding: 0;
+            background-color: #F3F4F6;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(to right, #7C3AED, #F97316);
+            color: white;
+            padding: 32px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .content {
+            padding: 32px 24px;
+            background-color: #ffffff;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #7C3AED;
+            color: white;
+            text-decoration: none;
+            border-radius: 9999px;
+            margin: 24px 0;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: background-color 0.3s ease;
+        }
+        .button:hover {
+            background-color: #6D28D9;
+        }
+        .link {
+            background-color: #F3F4F6;
+            padding: 12px;
+            border-radius: 8px;
+            word-break: break-all;
+            font-size: 14px;
+            color: #4B5563;
+        }
+        .footer {
+            text-align: center;
+            padding: 24px;
+            font-size: 12px;
+            color: #6B7280;
+            background-color: #F9FAFB;
+            border-top: 1px solid #E5E7EB;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Welcome to MiCounselor</h1>
+        </div>
+        
+        <div class="content">
+            <p>Hello,</p>
+            
+            <p>You've been invited to join MiCounselor as a counselor. We're excited to have you join our platform dedicated to healing connections and rebuilding bonds.</p>
+            
+            <p>Complete your registration and set up your counselor profile here:</p>
+            
+            <div style="text-align: center;">
+                <a href="<%= registrationLink %>" class="button">Complete Registration</a>
+            </div>
+            
+            <p>Alternative link:</p>
+            <div class="link"><%= registrationLink %></div>
+            
+            <p>This registration link is unique to you and will expire for security purposes. Contact our admin team if you need a new link.</p>
+            
+            <p>Best regards,<br>The MiCounselor Team</p>
+        </div>
+        
+        <div class="footer">
+            <p>This is an automated message, please do not reply.</p>
+            <p>&copy; <%= new Date().getFullYear() %> MiCounselor. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
