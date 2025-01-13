@@ -165,10 +165,19 @@ export const clearTokens = async (userId: string | Types.ObjectId, res: Response
         const userIdString = userId.toString();
         // Clear Redis session
         await redis.del(`user_${userIdString}`);
+        const cookieOptions = {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none' as const,
+            path: '/',
+            expires: new Date(0)
+        };
         
-        // Clear cookies
-        res.cookie("access_token", "", { maxAge: 1 });
-        res.cookie("refresh_token", "", { maxAge: 1 }); 
+        res.cookie("access_token", "", cookieOptions);
+        res.cookie("refresh_token", "", cookieOptions);
+
+        res.clearCookie("access_token");
+        res.clearCookie("refresh_token");
     } catch (error) {
         throw new Error("Error clearing tokens: " + error);
     }
