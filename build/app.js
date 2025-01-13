@@ -13,7 +13,6 @@ const userRoute_1 = __importDefault(require("./routes/userRoute"));
 const avatarRoute_1 = __importDefault(require("./routes/avatarRoute"));
 const bookingRoute_1 = __importDefault(require("./routes/bookingRoute"));
 const sessionRoute_1 = __importDefault(require("./routes/sessionRoute"));
-const helmet_1 = __importDefault(require("helmet"));
 //body parser
 exports.app.use(express_1.default.json({ limit: "50mb" }));
 //cookie parser
@@ -21,18 +20,7 @@ exports.app.use(express_1.default.json({ limit: "50mb" }));
 exports.app.use((0, cors_1.default)({
     origin: ['https://testing-george.vercel.app'],
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    exposedHeaders: ['set-cookie'],
-    maxAge: 600
 }));
-exports.app.use((0, helmet_1.default)({
-    crossOriginResourcePolicy: { policy: "cross-origin" },
-    crossOriginOpenerPolicy: { policy: "same-origin" }
-}));
-exports.app.use(helmet_1.default.noSniff());
-exports.app.use(helmet_1.default.xssFilter());
-exports.app.use(helmet_1.default.hidePoweredBy());
 exports.app.use((0, cookie_parser_1.default)());
 exports.app.set('trust proxy', 1);
 //routes
