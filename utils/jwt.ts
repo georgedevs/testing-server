@@ -45,6 +45,7 @@ export const accessTokenOptions: ITokenOptions = {
     httpOnly: true,
     sameSite: 'none',
     secure: true,
+    
 };
 
 export const refreshTokenOptions: ITokenOptions = {
@@ -165,19 +166,19 @@ export const clearTokens = async (userId: string | Types.ObjectId, res: Response
         const userIdString = userId.toString();
         // Clear Redis session
         await redis.del(`user_${userIdString}`);
+
         const cookieOptions = {
             httpOnly: true,
             secure: true,
-            sameSite: 'none' as const,
+            sameSite: 'none' as 'none',
             path: '/',
-            expires: new Date(0)
+            domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined,
+            maxAge: 0
         };
         
-        res.cookie("access_token", "", cookieOptions);
-        res.cookie("refresh_token", "", cookieOptions);
-
-        res.clearCookie("access_token");
-        res.clearCookie("refresh_token");
+        // Clear cookies
+        res.cookie("access_token", "", { maxAge: 1 });
+        res.cookie("refresh_token", "", { maxAge: 1 }); 
     } catch (error) {
         throw new Error("Error clearing tokens: " + error);
     }

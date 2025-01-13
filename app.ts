@@ -17,7 +17,16 @@ app.use(express.json({limit: "50mb"}))
 app.use(cors({
     origin: ['https://testing-george.vercel.app'],
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+    exposedHeaders: ['Set-Cookie'],
+    maxAge: 600
 }));
+
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Credentials', 'true');
+    next();
+});
 
 
 app.use(cookieParser());

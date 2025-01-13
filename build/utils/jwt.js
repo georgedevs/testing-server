@@ -119,6 +119,14 @@ const clearTokens = async (userId, res) => {
         const userIdString = userId.toString();
         // Clear Redis session
         await redis_1.redis.del(`user_${userIdString}`);
+        const cookieOptions = {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none',
+            path: '/',
+            domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined,
+            maxAge: 0
+        };
         // Clear cookies
         res.cookie("access_token", "", { maxAge: 1 });
         res.cookie("refresh_token", "", { maxAge: 1 });

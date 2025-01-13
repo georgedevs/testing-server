@@ -20,7 +20,15 @@ exports.app.use(express_1.default.json({ limit: "50mb" }));
 exports.app.use((0, cors_1.default)({
     origin: ['https://testing-george.vercel.app'],
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+    exposedHeaders: ['Set-Cookie'],
+    maxAge: 600
 }));
+exports.app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Credentials', 'true');
+    next();
+});
 exports.app.use((0, cookie_parser_1.default)());
 exports.app.set('trust proxy', 1);
 //routes
