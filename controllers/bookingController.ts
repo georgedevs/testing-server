@@ -615,100 +615,64 @@ function generateTimeSlots(
   return slots;
 }
 
+// New endpoint to get meeting tokens
 export const getMeetingToken = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     const { meetingId } = req.params;
     const userId = req.user?._id;
 
+    // Early return if no user ID
     if (!userId) {
       return next(new ErrorHandler('Authentication required', 401));
     }
 
     console.log('Getting token for meeting:', meetingId);
-    const meeting = await Meeting.findOne({
-      _id: meetingId,
-      status: 'confirmed',
-      $or: [
-        { clientId: userId },
-        { counselorId: userId }
-      ]
-    });
+      const meeting = await Meeting.findOne({
+        _id: meetingId,
+        status: 'confirmed',
+        $or: [
+          { clientId: userId },
+          { counselorId: userId }
+        ]
+      });
 
-    if (!meeting) {
-      console.log('Meeting not found or not confirmed');
-      return next(new ErrorHandler('Meeting not found or not confirmed', 404));
-    }
+      if (!meeting) {
+        console.log('Meeting not found or not confirmed');
+        return next(new ErrorHandler('Meeting not found or not confirmed', 404));
+      }
 
-    if (!meeting.dailyRoomName || !meeting.dailyRoomUrl) {
-      console.log('Meeting room not configured');
-      return next(new ErrorHandler('Meeting room not properly configured', 400));
-    }
+      if (!meeting.dailyRoomName || !meeting.dailyRoomUrl) {
+        console.log('Meeting room not configured');
+        return next(new ErrorHandler('Meeting room not properly configured', 400));
+      }
 
     if (!meeting.meetingDate || !meeting.meetingTime) {
       return next(new ErrorHandler('Meeting time not properly set', 400));
     }
 
-    // Create a UTC date from meeting date and time
+    // Check if meeting time is valid (within 5 minutes before start time)
+    const meetingDateTime = new Date(`${meeting.meetingDate.toISOString().split('T')[0]}T${meeting.meetingTime}`);
+    const currentTime = new Date();
+    const timeDifference = meetingDateTime.getTime() - currentTime.getTime();
+    const minutesBeforeMeeting = timeDifference / (1000 * 60);
+
+    if (minutesBeforeMeeting > 5) {
+      return next(new ErrorHandler('Meeting room is not yet available. Please join 5 minutes before the scheduled time.', 400));
+    }
+
+    if (minutesBeforeMeeting < -meeting.meetingDuration) {
+      return next(new ErrorHandler('Meeting has already ended', 400));
+    }
+
+    const isClient = meeting.clientId.toString() === userId.toString();
+    
     try {
-      // Get date components
-      const meetingDate = new Date(meeting.meetingDate);
-      const [hours, minutes] = meeting.meetingTime.split(':').map(Number);
-      
-      // Create UTC datetime
-      const meetingDateTime = new Date(Date.UTC(
-        meetingDate.getUTCFullYear(),
-        meetingDate.getUTCMonth(),
-        meetingDate.getUTCDate(),
-        hours,
-        minutes,
-        0
-      ));
-
-      console.log('Parsed meeting datetime:', {
-        original: {
-          date: meeting.meetingDate,
-          time: meeting.meetingTime
-        },
-        parsed: {
-          utc: meetingDateTime.toISOString(),
-          local: meetingDateTime.toString()
-        }
-      });
-
-      // Validate the parsed time
-      if (isNaN(meetingDateTime.getTime())) {
-        throw new Error('Invalid meeting time');
-      }
-
-      // Check if meeting time is valid (within 5 minutes before start time)
-      const currentTime = new Date();
-      const timeDifference = meetingDateTime.getTime() - currentTime.getTime();
-      const minutesBeforeMeeting = timeDifference / (1000 * 60);
-
-      console.log('Time checks:', {
-        meetingDateTime: meetingDateTime.toISOString(),
-        currentTime: currentTime.toISOString(),
-        minutesBeforeMeeting,
-        localMeetingTime: meetingDateTime.toLocaleString(),
-        localCurrentTime: currentTime.toLocaleString()
-      });
-
-      if (minutesBeforeMeeting > 5) {
-        return next(new ErrorHandler('Meeting room is not yet available. Please join 5 minutes before the scheduled time.', 400));
-      }
-
-      if (minutesBeforeMeeting < -meeting.meetingDuration) {
-        return next(new ErrorHandler('Meeting has already ended', 400));
-      }
-
-      const isClient = meeting.clientId.toString() === userId.toString();
-      
       // Create meeting token with anonymous identity
       const token = await dailyService.createMeetingToken(
-        meeting.dailyRoomName,
+        meeting.dailyRoomName!,
         isClient,
         meetingDateTime,
-        meeting.meetingDuration || 45
+        meeting.meetingDuration
       );
 
       // Return meeting access details
@@ -717,7 +681,7 @@ export const getMeetingToken = CatchAsyncError(
         token,
         roomUrl: meeting.dailyRoomUrl,
         joinAs: isClient ? 'Anonymous Client' : 'Anonymous Counselor',
-        meetingDuration: meeting.meetingDuration || 45,
+        meetingDuration: meeting.meetingDuration,
         meetingDateTime: meetingDateTime,
         meetingInstructions: {
           1: "Join 5 minutes before the scheduled time",
@@ -730,8 +694,7 @@ export const getMeetingToken = CatchAsyncError(
         }
       });
     } catch (error) {
-      console.error('Failed to process meeting time:', error);
-      return next(new ErrorHandler('Invalid meeting time configuration', 500));
+      return next(new ErrorHandler('Failed to create meeting token', 500));
     }
   }
 );
