@@ -10,7 +10,7 @@ userRouter.post('/registration',registrationLimiter, userRegistration)
 
 userRouter.post('/activation', activateUser)
 
-userRouter.post('/login',deviceCheck,loginLimiter, loginUser)
+userRouter.post('/login',loginUser)
 
 userRouter.post("/logout", isAuthenticated, logoutUser);
 
