@@ -693,7 +693,7 @@ export const getMeetingToken = CatchAsyncError(
         localCurrentTime: currentTime.toLocaleString()
       });
 
-      if (minutesBeforeMeeting > 5) {
+      if (minutesBeforeMeeting > 30) {
         return next(new ErrorHandler('Meeting room is not yet available. Please join 5 minutes before the scheduled time.', 400));
       }
 
