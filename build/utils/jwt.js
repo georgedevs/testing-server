@@ -19,14 +19,14 @@ exports.accessTokenOptions = {
     expires: new Date(Date.now() + accessTokenExpire * 60 * 1000),
     maxAge: accessTokenExpire * 60 * 1000,
     httpOnly: true,
-    sameSite: 'none',
+    sameSite: 'lax',
     secure: true,
 };
 exports.refreshTokenOptions = {
     expires: new Date(Date.now() + refreshTokenExpire * 60 * 1000),
     maxAge: refreshTokenExpire * 60 * 1000,
     httpOnly: true,
-    sameSite: 'none',
+    sameSite: 'lax',
     secure: true,
 };
 // Token generation functions
@@ -124,14 +124,14 @@ const clearTokens = async (userId, res) => {
             maxAge: 1,
             httpOnly: true,
             secure: true,
-            sameSite: 'none',
+            sameSite: 'lax',
             expires: new Date(0)
         });
         res.cookie("refresh_token", "", {
             maxAge: 1,
             httpOnly: true,
             secure: true,
-            sameSite: 'none',
+            sameSite: 'lax',
             expires: new Date(0)
         });
         return true;
