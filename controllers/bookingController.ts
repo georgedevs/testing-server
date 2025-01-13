@@ -621,70 +621,74 @@ export const getMeetingToken = CatchAsyncError(
     const { meetingId } = req.params;
     const userId = req.user?._id;
 
-    // Early return if no user ID
     if (!userId) {
       return next(new ErrorHandler('Authentication required', 401));
     }
 
     console.log('Getting token for meeting:', meetingId);
-      const meeting = await Meeting.findOne({
-        _id: meetingId,
-        status: 'confirmed',
-        $or: [
-          { clientId: userId },
-          { counselorId: userId }
-        ]
-      });
+    const meeting = await Meeting.findOne({
+      _id: meetingId,
+      status: 'confirmed',
+      $or: [
+        { clientId: userId },
+        { counselorId: userId }
+      ]
+    });
 
-      if (!meeting) {
-        console.log('Meeting not found or not confirmed');
-        return next(new ErrorHandler('Meeting not found or not confirmed', 404));
-      }
+    if (!meeting) {
+      console.log('Meeting not found or not confirmed');
+      return next(new ErrorHandler('Meeting not found or not confirmed', 404));
+    }
 
-      if (!meeting.dailyRoomName || !meeting.dailyRoomUrl) {
-        console.log('Meeting room not configured');
-        return next(new ErrorHandler('Meeting room not properly configured', 400));
-      }
+    if (!meeting.dailyRoomName || !meeting.dailyRoomUrl) {
+      console.log('Meeting room not configured');
+      return next(new ErrorHandler('Meeting room not properly configured', 400));
+    }
 
     if (!meeting.meetingDate || !meeting.meetingTime) {
       return next(new ErrorHandler('Meeting time not properly set', 400));
     }
 
-    // Check if meeting time is valid (within 5 minutes before start time)
-    const meetingDateTime = new Date(`${meeting.meetingDate.toISOString().split('T')[0]}T${meeting.meetingTime}`);
+    // Parse meeting time in UTC
+    const meetingDateTime = new Date(`${meeting.meetingDate.toISOString().split('T')[0]}T${meeting.meetingTime}Z`);
     const currentTime = new Date();
+    
+    // Convert both times to timestamps for comparison
     const timeDifference = meetingDateTime.getTime() - currentTime.getTime();
     const minutesBeforeMeeting = timeDifference / (1000 * 60);
 
-    if (minutesBeforeMeeting > 5) {
-      return next(new ErrorHandler('Meeting room is not yet available. Please join 5 minutes before the scheduled time.', 400));
+    console.log('Time difference in minutes:', minutesBeforeMeeting);
+    console.log('Current time:', currentTime);
+    console.log('Meeting time:', meetingDateTime);
+
+    // Allow access from 10 minutes before until 45 minutes after start time
+    if (minutesBeforeMeeting > 10) {
+      return next(new ErrorHandler('Meeting room is not yet available. Please join 5-10 minutes before the scheduled time.', 400));
     }
 
-    if (minutesBeforeMeeting < -meeting.meetingDuration) {
+    if (minutesBeforeMeeting < -45) {
       return next(new ErrorHandler('Meeting has already ended', 400));
     }
 
     const isClient = meeting.clientId.toString() === userId.toString();
     
     try {
-      // Create meeting token with anonymous identity
       const token = await dailyService.createMeetingToken(
-        meeting.dailyRoomName!,
+        meeting.dailyRoomName,
         isClient,
         meetingDateTime,
-        meeting.meetingDuration
+        meeting.meetingDuration || 45
       );
 
-      // Return meeting access details
       res.status(200).json({
         success: true,
         token,
         roomUrl: meeting.dailyRoomUrl,
         joinAs: isClient ? 'Anonymous Client' : 'Anonymous Counselor',
-        meetingDuration: meeting.meetingDuration,
+        meetingDuration: meeting.meetingDuration || 45,
         meetingDateTime: meetingDateTime,
         meetingInstructions: {
-          1: "Join 5 minutes before the scheduled time",
+          1: "Join 5-10 minutes before the scheduled time",
           2: "Ensure you're in a quiet, private space",
           3: "Your audio will be enabled by default",
           4: "Video will remain disabled for anonymity",
@@ -694,6 +698,7 @@ export const getMeetingToken = CatchAsyncError(
         }
       });
     } catch (error) {
+      console.error('Token creation error:', error);
       return next(new ErrorHandler('Failed to create meeting token', 500));
     }
   }

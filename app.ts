@@ -29,6 +29,17 @@ app.use((req, res, next) => {
 });
 
 
+app.use(
+    helmet({
+        crossOriginResourcePolicy: { policy: "cross-origin" },
+        crossOriginOpenerPolicy: { policy: "same-origin" }
+    })
+);
+app.use(helmet.noSniff());
+app.use(helmet.xssFilter());
+app.use(helmet.hidePoweredBy());
+
+
 app.use(cookieParser());
 
 app.set('trust proxy', 1);
