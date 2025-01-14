@@ -19,36 +19,14 @@ class DailyService {
     };
   }
 
-  private adjustToServerTime(localDate: Date): Date {
-    // Convert local time to UTC time that matches the desired local time
-    const year = localDate.getFullYear();
-    const month = localDate.getMonth();
-    const day = localDate.getDate();
-    const hours = localDate.getHours();
-    const minutes = localDate.getMinutes();
-    const seconds = localDate.getSeconds();
-
-    // Create a UTC date that will appear as the desired local time
-    return new Date(Date.UTC(year, month, day, hours, minutes, seconds));
-  }
-
-  async createRoom(meetingId: string, scheduledTime: Date | string, durationMinutes: number = 45) {
+  async createRoom(meetingId: string, scheduledTime: Date, durationMinutes: number = 45) {
     try {
-      const dateObj = typeof scheduledTime === 'string' ? new Date(scheduledTime) : scheduledTime;
-      const adjustedTime = this.adjustToServerTime(dateObj);
-      
       // Calculate room expiration - 24 hours after scheduled meeting end time
-      const meetingEndTime = addMinutes(adjustedTime, durationMinutes);
+      const meetingEndTime = addMinutes(scheduledTime, durationMinutes);
       const roomExpiration = Math.floor(addDays(meetingEndTime, 1).getTime() / 1000);
       
       // Calculate when meeting should start (5 minutes before scheduled time)
-      const nbfTime = Math.floor(addMinutes(adjustedTime, -5).getTime() / 1000);
-
-      console.log('Creating room with times:', {
-        scheduledTime: adjustedTime.toISOString(),
-        nbfTime: new Date(nbfTime * 1000).toISOString(),
-        expirationTime: new Date(roomExpiration * 1000).toISOString()
-      });
+      const nbfTime = Math.floor(addMinutes(scheduledTime, -5).getTime() / 1000);
 
       const response = await axios.post(
         `${this.baseUrl}/rooms`,
@@ -67,6 +45,7 @@ class DailyService {
             enable_recording: false,
             eject_at_room_exp: true,
             lang: 'en',
+            // Removed enable_network_ui as it's not a valid property
           },
         },
         { headers: this.getHeaders() }
@@ -79,28 +58,14 @@ class DailyService {
     }
   }
 
-  async createMeetingToken(
-    roomName: string, 
-    isClient: boolean, 
-    scheduledTime: Date | string, 
-    durationMinutes: number = 45
-  ) {
+  async createMeetingToken(roomName: string, isClient: boolean, scheduledTime: Date, durationMinutes: number = 45) {
     try {
-      const dateObj = typeof scheduledTime === 'string' ? new Date(scheduledTime) : scheduledTime;
-      const adjustedTime = this.adjustToServerTime(dateObj);
-      
       // Token expires 24 hours after meeting end time
-      const meetingEndTime = addMinutes(adjustedTime, durationMinutes);
+      const meetingEndTime = addMinutes(scheduledTime, durationMinutes);
       const tokenExpiration = Math.floor(addDays(meetingEndTime, 1).getTime() / 1000);
     
       // Token becomes valid 5 minutes before meeting
-      const tokenStartTime = Math.floor(addMinutes(adjustedTime, -5).getTime() / 1000);
-
-      console.log('Creating token with times:', {
-        scheduledTime: adjustedTime.toISOString(),
-        tokenStartTime: new Date(tokenStartTime * 1000).toISOString(),
-        tokenExpiration: new Date(tokenExpiration * 1000).toISOString()
-      });
+      const tokenStartTime = Math.floor(addMinutes(scheduledTime, -5).getTime() / 1000);
 
       const response = await axios.post(
         `${this.baseUrl}/meeting-tokens`,
