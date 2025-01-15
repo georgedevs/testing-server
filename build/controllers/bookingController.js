@@ -259,13 +259,7 @@ exports.acceptMeeting = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res,
         return next(new errorHandler_1.default('Meeting time not properly set', 400));
     }
     // Create meeting datetime
-    const [hours, minutes] = meeting.meetingTime.split(':').map(Number);
-    const meetingDateTime = new Date(Date.UTC(meeting.meetingDate.getUTCFullYear(), meeting.meetingDate.getUTCMonth(), meeting.meetingDate.getUTCDate(), hours, minutes));
-    console.log('Creating room with time:', {
-        originalDate: meeting.meetingDate,
-        originalTime: meeting.meetingTime,
-        utcDateTime: meetingDateTime
-    });
+    const meetingDateTime = new Date(`${meeting.meetingDate.toISOString().split('T')[0]}T${meeting.meetingTime}`);
     // Create Daily.co room
     if (meeting.meetingType === 'virtual') {
         try {
@@ -508,6 +502,7 @@ function generateTimeSlots(startTime, endTime, intervalMinutes, bookedTimes) {
 exports.getMeetingToken = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
     const { meetingId } = req.params;
     const userId = req.user?._id;
+    // Early return if no user ID
     if (!userId) {
         return next(new errorHandler_1.default('Authentication required', 401));
     }
@@ -531,18 +526,17 @@ exports.getMeetingToken = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, re
     if (!meeting.meetingDate || !meeting.meetingTime) {
         return next(new errorHandler_1.default('Meeting time not properly set', 400));
     }
-    // Create meeting datetime in UTC
-    const meetingDateStr = meeting.meetingDate.toISOString().split('T')[0];
-    const [hours, minutes] = meeting.meetingTime.split(':').map(Number);
-    // Create a UTC date object for the meeting time
-    const meetingDateTime = new Date(Date.UTC(meeting.meetingDate.getUTCFullYear(), meeting.meetingDate.getUTCMonth(), meeting.meetingDate.getUTCDate(), hours, minutes));
-    console.log('Meeting time checks:', {
-        originalDate: meeting.meetingDate,
-        originalTime: meeting.meetingTime,
-        constructedDateTime: meetingDateTime,
-        currentTime: new Date(),
-        timeUntilMeeting: (meetingDateTime.getTime() - new Date().getTime()) / (1000 * 60)
-    });
+    // Check if meeting time is valid (within 5 minutes before start time)
+    const meetingDateTime = new Date(`${meeting.meetingDate.toISOString().split('T')[0]}T${meeting.meetingTime}`);
+    const currentTime = new Date();
+    const timeDifference = meetingDateTime.getTime() - currentTime.getTime();
+    const minutesBeforeMeeting = timeDifference / (1000 * 60);
+    if (minutesBeforeMeeting > 5) {
+        return next(new errorHandler_1.default('Meeting room is not yet available. Please join 5 minutes before the scheduled time.', 400));
+    }
+    if (minutesBeforeMeeting < -meeting.meetingDuration) {
+        return next(new errorHandler_1.default('Meeting has already ended', 400));
+    }
     const isClient = meeting.clientId.toString() === userId.toString();
     try {
         // Create meeting token with anonymous identity
@@ -567,7 +561,6 @@ exports.getMeetingToken = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, re
         });
     }
     catch (error) {
-        console.error('Token creation error:', error);
         return next(new errorHandler_1.default('Failed to create meeting token', 500));
     }
 });
