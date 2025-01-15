@@ -3,10 +3,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+process.env.TZ = 'Europe/Paris'; // Set timezone first
 const http_1 = __importDefault(require("http"));
 const app_1 = require("./app");
 const db_1 = __importDefault(require("./utils/db"));
 const socketServer_1 = require("./socketServer");
+const getCurrentUTC1Time = () => {
+    return new Date().toLocaleString('en-US', {
+        timeZone: 'Europe/Paris'
+    });
+};
 // Create HTTP server
 const server = http_1.default.createServer(app_1.app);
 // Initialize socket server
@@ -17,6 +23,6 @@ app_1.app.set('socketEvents', socketEvents);
 // Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-    console.log(`Server is connected with port ${PORT}`);
+    console.log(`Server is connected with port ${PORT} at ${getCurrentUTC1Time()}`);
     (0, db_1.default)();
 });
