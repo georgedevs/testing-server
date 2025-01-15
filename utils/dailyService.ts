@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { addMinutes, addDays } from 'date-fns';
+import { addMinutes, addDays, subMinutes } from 'date-fns';
+import { convertToUTC } from './dateUtils';
 
 class DailyService {
   private apiKey: string;
@@ -21,12 +22,15 @@ class DailyService {
 
   async createRoom(meetingId: string, scheduledTime: Date, durationMinutes: number = 45) {
     try {
-      // Calculate room expiration - 24 hours after scheduled meeting end time
-      const meetingEndTime = addMinutes(scheduledTime, durationMinutes);
+      // Convert scheduled time to UTC if not already
+      const utcScheduledTime = convertToUTC(scheduledTime);
+      
+      // Calculate room expiration in UTC
+      const meetingEndTime = addMinutes(utcScheduledTime, durationMinutes);
       const roomExpiration = Math.floor(addDays(meetingEndTime, 1).getTime() / 1000);
       
-      // Calculate when meeting should start (5 minutes before scheduled time)
-      const nbfTime = Math.floor(addMinutes(scheduledTime, -5).getTime() / 1000);
+      // Calculate meeting start time in UTC (5 minutes before)
+      const nbfTime = Math.floor(subMinutes(utcScheduledTime, 5).getTime() / 1000);
 
       const response = await axios.post(
         `${this.baseUrl}/rooms`,
@@ -61,11 +65,13 @@ class DailyService {
   async createMeetingToken(roomName: string, isClient: boolean, scheduledTime: Date, durationMinutes: number = 45) {
     try {
       // Token expires 24 hours after meeting end time
-      const meetingEndTime = addMinutes(scheduledTime, durationMinutes);
+      const utcScheduledTime = convertToUTC(scheduledTime);
+      
+      // Calculate token times in UTC
+      const meetingEndTime = addMinutes(utcScheduledTime, durationMinutes);
       const tokenExpiration = Math.floor(addDays(meetingEndTime, 1).getTime() / 1000);
-    
-      // Token becomes valid 5 minutes before meeting
-      const tokenStartTime = Math.floor(addMinutes(scheduledTime, -5).getTime() / 1000);
+      const tokenStartTime = Math.floor(subMinutes(utcScheduledTime, 5).getTime() / 1000);
+
 
       const response = await axios.post(
         `${this.baseUrl}/meeting-tokens`,

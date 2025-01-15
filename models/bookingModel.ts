@@ -46,7 +46,8 @@ const meetingSchema = new Schema({
     required: true
   },
   meetingDate: {
-    type: Date
+    type: Date,
+    get: (date: Date) => date && new Date(date.getTime() + date.getTimezoneOffset() * 60000)
   },
   meetingTime: {
     type: String
@@ -87,10 +88,12 @@ const meetingSchema = new Schema({
   },
   meetingDuration: {
     type: Number,
-    default: 45 // Default to 45 minutes
+    default: 45 
   }
 }, {
-  timestamps: true
+  timestamps: {
+    currentTime: () => new Date(Date.now() + new Date().getTimezoneOffset() * 60000)
+  }
 });
 
 export const Meeting = mongoose.model<IMeeting>('Meeting', meetingSchema);

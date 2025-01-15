@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.dailyService = void 0;
 const axios_1 = __importDefault(require("axios"));
 const date_fns_1 = require("date-fns");
+const dateUtils_1 = require("./dateUtils");
 class DailyService {
     constructor() {
         this.baseUrl = 'https://api.daily.co/v1';
@@ -22,11 +23,13 @@ class DailyService {
     }
     async createRoom(meetingId, scheduledTime, durationMinutes = 45) {
         try {
-            // Calculate room expiration - 24 hours after scheduled meeting end time
-            const meetingEndTime = (0, date_fns_1.addMinutes)(scheduledTime, durationMinutes);
+            // Convert scheduled time to UTC if not already
+            const utcScheduledTime = (0, dateUtils_1.convertToUTC)(scheduledTime);
+            // Calculate room expiration in UTC
+            const meetingEndTime = (0, date_fns_1.addMinutes)(utcScheduledTime, durationMinutes);
             const roomExpiration = Math.floor((0, date_fns_1.addDays)(meetingEndTime, 1).getTime() / 1000);
-            // Calculate when meeting should start (5 minutes before scheduled time)
-            const nbfTime = Math.floor((0, date_fns_1.addMinutes)(scheduledTime, -5).getTime() / 1000);
+            // Calculate meeting start time in UTC (5 minutes before)
+            const nbfTime = Math.floor((0, date_fns_1.subMinutes)(utcScheduledTime, 5).getTime() / 1000);
             const response = await axios_1.default.post(`${this.baseUrl}/rooms`, {
                 name: `meeting-${meetingId}`,
                 privacy: 'private',
@@ -55,10 +58,11 @@ class DailyService {
     async createMeetingToken(roomName, isClient, scheduledTime, durationMinutes = 45) {
         try {
             // Token expires 24 hours after meeting end time
-            const meetingEndTime = (0, date_fns_1.addMinutes)(scheduledTime, durationMinutes);
+            const utcScheduledTime = (0, dateUtils_1.convertToUTC)(scheduledTime);
+            // Calculate token times in UTC
+            const meetingEndTime = (0, date_fns_1.addMinutes)(utcScheduledTime, durationMinutes);
             const tokenExpiration = Math.floor((0, date_fns_1.addDays)(meetingEndTime, 1).getTime() / 1000);
-            // Token becomes valid 5 minutes before meeting
-            const tokenStartTime = Math.floor((0, date_fns_1.addMinutes)(scheduledTime, -5).getTime() / 1000);
+            const tokenStartTime = Math.floor((0, date_fns_1.subMinutes)(utcScheduledTime, 5).getTime() / 1000);
             const response = await axios_1.default.post(`${this.baseUrl}/meeting-tokens`, {
                 properties: {
                     room_name: roomName,
