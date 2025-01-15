@@ -46,8 +46,7 @@ const meetingSchema = new Schema({
     required: true
   },
   meetingDate: {
-    type: Date,
-    get: (date: Date) => date && new Date(date.getTime() + date.getTimezoneOffset() * 60000)
+    type: Date
   },
   meetingTime: {
     type: String
@@ -91,9 +90,7 @@ const meetingSchema = new Schema({
     default: 45 
   }
 }, {
-  timestamps: {
-    currentTime: () => new Date(Date.now() + new Date().getTimezoneOffset() * 60000)
-  }
+  timestamps: true
 });
 
 export const Meeting = mongoose.model<IMeeting>('Meeting', meetingSchema);

@@ -298,6 +298,7 @@ const generateMeetingInstructions = (isClient: boolean) => `
 8. If you experience technical issues, use the chat feature to communicate
 `;
 
+
 export const acceptMeeting = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     const { meetingId } = req.body;
@@ -699,6 +700,7 @@ export const getMeetingToken = CatchAsyncError(
     }
   }
 );
+
 
 // Helper function to validate meeting time
 export const validateMeetingTime = (meetingDate: Date | undefined, meetingTime: string | undefined): boolean => {
