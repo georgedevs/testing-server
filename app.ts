@@ -7,42 +7,23 @@ import userRouter from "./routes/userRoute";
 import avatarRouter from "./routes/avatarRoute";
 import bookingRouter from "./routes/bookingRoute";
 import sessionRouter from "./routes/sessionRoute";
-import helmet from "helmet";
 
 //body parser
 app.use(express.json({limit: "50mb"}))
 
+app.use(cookieParser());
+
 //cookie parser
+
+app.set('trust proxy', 1);
+
+
 // CORS - Cross-Origin Resource Sharing
 app.use(cors({
     origin: ['https://testing-george.vercel.app'],
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
-    exposedHeaders: ['Set-Cookie'],
-    maxAge: 600
 }));
 
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Credentials', 'true');
-    next();
-});
-
-
-app.use(
-    helmet({
-        crossOriginResourcePolicy: { policy: "cross-origin" },
-        crossOriginOpenerPolicy: { policy: "same-origin" }
-    })
-);
-app.use(helmet.noSniff());
-app.use(helmet.xssFilter());
-app.use(helmet.hidePoweredBy());
-
-
-app.use(cookieParser());
-
-app.set('trust proxy', 1);
 
 //routes
 app.use("/api/v1", userRouter)
