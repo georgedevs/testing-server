@@ -925,16 +925,14 @@ exports.getSessionRatingStatus = (0, catchAsyncErrors_1.CatchAsyncError)(async (
 });
 exports.getCounselorFeedback = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
     const counselorId = req.user?._id;
-    // Check if counselorId exists
     if (!counselorId) {
-        return next(new errorHandler_1.default('Authentication required', 401));
+        return next(new errorHandler_1.default('Counselor ID not found', 401));
     }
     const { page = 1, limit = 10, sortBy = 'date', order = 'desc' } = req.query;
-    // Validate pagination parameters
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
     const skip = (pageNum - 1) * limitNum;
-    // Find all completed meetings for the counselor
+    // Find all completed meetings for the counselor with populated client data
     const completedMeetings = await bookingModel_1.Meeting.find({
         counselorId,
         status: 'completed'
@@ -943,24 +941,22 @@ exports.getCounselorFeedback = (0, catchAsyncErrors_1.CatchAsyncError)(async (re
         .sort({ meetingDate: order === 'desc' ? -1 : 1 })
         .skip(skip)
         .limit(limitNum);
-    // Get total count for pagination
-    const totalCount = await bookingModel_1.Meeting.countDocuments({
-        counselorId,
-        status: 'completed'
-    });
     // Process meetings to get feedback
     const feedbackList = [];
+    const processedSessionIds = new Set();
     for (const meeting of completedMeetings) {
-        const client = await userModel_1.Client.findById(meeting.clientId);
-        if (!client)
+        if (!meeting.clientId || !mongoose_1.default.isValidObjectId(meeting.clientId._id))
             continue;
+        const client = meeting.clientId;
         // Find corresponding session in client's history
-        const session = client.sessionHistory.find(s => s.counselorId.toString() === counselorId.toString() &&
+        const session = client.sessionHistory?.find(s => s.counselorId.toString() === counselorId.toString() &&
             s.sessionDate.toISOString() === meeting.meetingDate?.toISOString());
-        // Only include sessions that have ratings
-        if (session?.rating) {
+        // Only include sessions that have ratings and haven't been processed yet
+        const sessionId = meeting._id.toString();
+        if (session?.rating && !processedSessionIds.has(sessionId)) {
+            processedSessionIds.add(sessionId);
             feedbackList.push({
-                sessionId: meeting._id.toString(),
+                sessionId,
                 clientUsername: client.username || 'Anonymous',
                 sessionDate: meeting.meetingDate ? (0, date_fns_1.format)(new Date(meeting.meetingDate), 'PPP') : 'N/A',
                 sessionTime: meeting.meetingTime || 'N/A',
@@ -970,12 +966,6 @@ exports.getCounselorFeedback = (0, catchAsyncErrors_1.CatchAsyncError)(async (re
                 issueDescription: meeting.issueDescription
             });
         }
-    }
-    // Sort feedback based on query parameter
-    if (sortBy === 'rating') {
-        feedbackList.sort((a, b) => {
-            return order === 'desc' ? b.rating - a.rating : a.rating - b.rating;
-        });
     }
     // Calculate statistics
     const totalRatings = feedbackList.length;
@@ -989,6 +979,11 @@ exports.getCounselorFeedback = (0, catchAsyncErrors_1.CatchAsyncError)(async (re
         2: feedbackList.filter(f => f.rating === 2).length,
         1: feedbackList.filter(f => f.rating === 1).length
     };
+    // Get total count for pagination
+    const total = await bookingModel_1.Meeting.countDocuments({
+        counselorId,
+        status: 'completed'
+    });
     res.status(200).json({
         success: true,
         data: {
@@ -1000,8 +995,8 @@ exports.getCounselorFeedback = (0, catchAsyncErrors_1.CatchAsyncError)(async (re
             },
             pagination: {
                 currentPage: pageNum,
-                totalPages: Math.ceil(totalCount / limitNum),
-                totalItems: totalCount,
+                totalPages: Math.ceil(total / limitNum),
+                totalItems: total,
                 itemsPerPage: limitNum
             }
         }
