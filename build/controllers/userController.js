@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteAccount = exports.updateCounselorProfile = exports.updateClientProfile = exports.updateAvatar = exports.resetPassword = exports.forgotPassword = exports.updatePassword = exports.googleAuth = exports.getUserInfo = exports.updateAccessToken = exports.logoutUser = exports.loginUser = exports.activateUser = exports.userRegistration = void 0;
+exports.updateTourStatus = exports.deleteAccount = exports.updateCounselorProfile = exports.updateClientProfile = exports.updateAvatar = exports.resetPassword = exports.forgotPassword = exports.updatePassword = exports.googleAuth = exports.getUserInfo = exports.updateAccessToken = exports.logoutUser = exports.loginUser = exports.activateUser = exports.userRegistration = void 0;
 const userModel_1 = require("../models/userModel");
 const errorHandler_1 = __importDefault(require("../utils/errorHandler"));
 const catchAsyncErrors_1 = require("../middleware/catchAsyncErrors");
@@ -799,6 +799,30 @@ exports.deleteAccount = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res,
         res.status(200).json({
             success: true,
             message: "Account deleted successfully"
+        });
+    }
+    catch (error) {
+        return next(new errorHandler_1.default(error.message, 500));
+    }
+});
+exports.updateTourStatus = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
+    try {
+        const userId = req.user?._id;
+        if (!userId) {
+            return next(new errorHandler_1.default("User not authenticated", 401));
+        }
+        const user = await userModel_1.User.findById(userId);
+        if (!user) {
+            return next(new errorHandler_1.default("User not found", 404));
+        }
+        user.tourViewed = true;
+        await user.save();
+        // Update Redis cache
+        const redisKey = getRedisKey(userId);
+        await redis_1.redis.set(redisKey, JSON.stringify(user));
+        res.status(200).json({
+            success: true,
+            message: "Tour status updated successfully"
         });
     }
     catch (error) {

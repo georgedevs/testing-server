@@ -31,4 +31,5 @@ userRouter.put('/admin/counselors/:counselorId/approve', auth_1.isAuthenticated,
 userRouter.delete('/admin/counselors/:counselorId/reject', auth_1.isAuthenticated, auth_1.isAdmin, adminController_1.rejectCounselorAccount);
 userRouter.get('/admin/counselors', auth_1.isAuthenticated, auth_1.isAdmin, adminController_1.getAllCounselors);
 userRouter.delete('/admin/counselors/:counselorId/delete', auth_1.isAuthenticated, auth_1.isAdmin, adminController_1.deleteCounselorAccount);
+userRouter.put('/update-tour-status', auth_1.isAuthenticated, userController_1.updateTourStatus);
 exports.default = userRouter;

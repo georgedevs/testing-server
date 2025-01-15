@@ -32,6 +32,7 @@ export interface IUser extends Document {
   isActive: boolean;
   notifications: INotification[];
   lastActive: Date;
+  tourViewed: boolean;
   comparePassword(password: string): Promise<boolean>;
   signAccessToken:() => string;
   signRefreshToken:() => string;
@@ -161,6 +162,10 @@ const userSchema = new Schema<IUser>({
       default: Date.now,
     },
   }],
+  tourViewed: {
+    type: Boolean,
+    default: false
+},
   lastActive: {
     type: Date,
     default: Date.now,

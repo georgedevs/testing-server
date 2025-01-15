@@ -1061,3 +1061,34 @@ export const updateAvatar = CatchAsyncError(
       }
     }
   );
+
+export const updateTourStatus = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+      try {
+          const userId = req.user?._id;
+
+          if (!userId) {
+              return next(new ErrorHandler("User not authenticated", 401));
+          }
+
+          const user = await User.findById(userId);
+          if (!user) {
+              return next(new ErrorHandler("User not found", 404));
+          }
+
+          user.tourViewed = true;
+          await user.save();
+
+          // Update Redis cache
+          const redisKey = getRedisKey(userId);
+          await redis.set(redisKey, JSON.stringify(user));
+
+          res.status(200).json({
+              success: true,
+              message: "Tour status updated successfully"
+          });
+      } catch (error: any) {
+          return next(new ErrorHandler(error.message, 500));
+      }
+  }
+);

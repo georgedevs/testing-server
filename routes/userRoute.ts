@@ -1,5 +1,5 @@
 import express from 'express';
-import { activateUser, forgotPassword, getUserInfo, loginUser, logoutUser, resetPassword, googleAuth, updateAccessToken, updateClientProfile, updateCounselorProfile, updatePassword, userRegistration, deleteAccount } from '../controllers/userController';
+import { activateUser, forgotPassword, getUserInfo, loginUser, logoutUser, resetPassword, googleAuth, updateAccessToken, updateClientProfile, updateCounselorProfile, updatePassword, userRegistration, deleteAccount, updateTourStatus } from '../controllers/userController';
 import { approveCounselorAccount, deleteCounselorAccount, generateCounselorRegistrationLink, getAllCounselors, getPendingCounselors, rejectCounselorAccount,  } from '../controllers/adminController';
 import { isAdmin, isAuthenticated, isCounselor } from '../middleware/auth';
 import { loginLimiter, registrationLimiter } from '../middleware/rateLimit';
@@ -76,4 +76,5 @@ userRouter.post(
     deleteCounselorAccount
   )
 
+  userRouter.put('/update-tour-status', isAuthenticated, updateTourStatus);
 export default userRouter;

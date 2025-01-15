@@ -94,6 +94,10 @@ const userSchema = new mongoose_1.Schema({
                 default: Date.now,
             },
         }],
+    tourViewed: {
+        type: Boolean,
+        default: false
+    },
     lastActive: {
         type: Date,
         default: Date.now,
