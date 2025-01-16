@@ -42,7 +42,6 @@ class DailyService {
                     enable_recording: false,
                     eject_at_room_exp: true,
                     lang: 'en',
-                    // Removed enable_network_ui as it's not a valid property
                 },
             }, { headers: this.getHeaders() });
             return response.data;

@@ -9,8 +9,11 @@ import bookingRouter from "./routes/bookingRoute";
 import sessionRouter from "./routes/sessionRoute";
 
 const allowedOrigins = [
-    'https://testing-george.vercel.app',
-  ];
+  'https://testing-george.vercel.app',
+  'https://testing-george.vercel.app/',
+  'https://www.testing-george.vercel.app',
+  'https://www.testing-george.vercel.app/'
+];
 
 //body parser
 app.use(express.json({limit: "50mb"}))
@@ -22,22 +25,21 @@ app.use(cookieParser());
 app.set('trust proxy', 1);
 
 
-// CORS - Cross-Origin Resource Sharing
+
 app.use(cors({
-    origin: function(origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-      
-      if (allowedOrigins.indexOf(origin) === -1) {
-        const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-        return callback(new Error(msg), false);
-      }
-      return callback(null, true);
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'device-id'],
-  }));
+  origin: function(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'device-id'],
+  exposedHeaders: ['set-cookie']
+}));
+
 
   app.use((req, res, next) => {
     res.setHeader('Permissions-Policy', 'interest-cohort=()'); // Opt out of FLoC

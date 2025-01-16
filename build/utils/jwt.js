@@ -11,7 +11,6 @@ const mongoose_1 = require("mongoose");
 // Default token expiration times (in minutes)
 const DEFAULT_ACCESS_TOKEN_EXPIRE = 60; // 1 hour
 const DEFAULT_REFRESH_TOKEN_EXPIRE = 10080; // 7 days
-// Parse environment variables with fallback values
 const accessTokenExpire = parseInt(process.env.ACCESS_TOKEN_EXPIRE || `${DEFAULT_ACCESS_TOKEN_EXPIRE}`, 10);
 const refreshTokenExpire = parseInt(process.env.REFRESH_TOKEN_EXPIRE || `${DEFAULT_REFRESH_TOKEN_EXPIRE}`, 10);
 // Token configuration options
@@ -21,6 +20,8 @@ exports.accessTokenOptions = {
     httpOnly: true,
     sameSite: 'none',
     secure: true,
+    path: '/',
+    domain: '.vercel.app'
 };
 exports.refreshTokenOptions = {
     expires: new Date(Date.now() + refreshTokenExpire * 60 * 1000),
@@ -28,6 +29,8 @@ exports.refreshTokenOptions = {
     httpOnly: true,
     sameSite: 'none',
     secure: true,
+    path: '/',
+    domain: '.vercel.app'
 };
 // Token generation functions
 const generateAccessToken = (user) => {
@@ -44,7 +47,6 @@ const generateRefreshToken = (user) => {
     }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: `${refreshTokenExpire}m` });
 };
 exports.generateRefreshToken = generateRefreshToken;
-// Token verification functions
 const verifyAccessToken = async (token) => {
     return jsonwebtoken_1.default.verify(token, process.env.ACCESS_TOKEN_SECRET);
 };
@@ -58,19 +60,27 @@ const sendToken = async (user, statusCode, res) => {
     try {
         const accessToken = (0, exports.generateAccessToken)(user);
         const refreshToken = (0, exports.generateRefreshToken)(user);
-        // Create session data
+        // Session data
         const sessionData = {
             user_id: user._id.toString(),
             role: user.role,
             email: user.email,
             lastActive: new Date(),
         };
-        // Store user session in Redis with proper type handling
+        // Store in Redis with proper expiry
         await redis_1.redis.set(`user_${user._id.toString()}`, JSON.stringify(sessionData), 'EX', refreshTokenExpire * 60);
-        // Set secure cookies
-        res.cookie("access_token", accessToken, exports.accessTokenOptions);
-        res.cookie("refresh_token", refreshToken, exports.refreshTokenOptions);
-        // Remove sensitive information from user object
+        // Set cookies with proper options
+        res.cookie("access_token", accessToken, {
+            ...exports.accessTokenOptions,
+            sameSite: 'none',
+            secure: true
+        });
+        res.cookie("refresh_token", refreshToken, {
+            ...exports.refreshTokenOptions,
+            sameSite: 'none',
+            secure: true
+        });
+        // Response object
         const userResponse = {
             _id: user._id,
             email: user.email,
@@ -100,7 +110,6 @@ const refreshAccessToken = async (refreshToken) => {
             throw new Error("Invalid refresh token");
         }
         const sessionData = JSON.parse(userSession);
-        // Create a minimal user object with required properties
         const user = {
             _id: new mongoose_1.Types.ObjectId(sessionData.user_id),
             role: sessionData.role,
@@ -119,7 +128,6 @@ const clearTokens = async (userId, res) => {
         const userIdString = userId.toString();
         // Clear Redis session
         await redis_1.redis.del(`user_${userIdString}`);
-        // Clear cookies by setting them to empty and expiring them immediately
         res.cookie("access_token", "", {
             maxAge: 1,
             httpOnly: true,

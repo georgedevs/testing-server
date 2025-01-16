@@ -12,6 +12,8 @@ interface ITokenOptions {
     httpOnly: boolean;
     sameSite: 'lax' | 'strict' | 'none' | undefined;
     secure?: boolean;
+    path?:string;
+    domain?:string;
 }
 
 interface IDecodedToken {
@@ -34,7 +36,6 @@ interface IUserSession {
 const DEFAULT_ACCESS_TOKEN_EXPIRE = 60; // 1 hour
 const DEFAULT_REFRESH_TOKEN_EXPIRE = 10080; // 7 days
 
-// Parse environment variables with fallback values
 const accessTokenExpire = parseInt(process.env.ACCESS_TOKEN_EXPIRE || `${DEFAULT_ACCESS_TOKEN_EXPIRE}`, 10);
 const refreshTokenExpire = parseInt(process.env.REFRESH_TOKEN_EXPIRE || `${DEFAULT_REFRESH_TOKEN_EXPIRE}`, 10);
 
@@ -45,6 +46,8 @@ export const accessTokenOptions: ITokenOptions = {
     httpOnly: true,
     sameSite: 'none',
     secure: true,
+    path: '/',
+    domain: '.vercel.app'
 };
 
 export const refreshTokenOptions: ITokenOptions = {
@@ -53,7 +56,9 @@ export const refreshTokenOptions: ITokenOptions = {
     httpOnly: true,
     sameSite: 'none',
     secure: true,
-};
+    path: '/',
+    domain: '.vercel.app'
+  };
 
 // Token generation functions
 export const generateAccessToken = (user: IUser): string => {
@@ -78,7 +83,7 @@ export const generateRefreshToken = (user: IUser): string => {
     );
 };
 
-// Token verification functions
+
 export const verifyAccessToken = async (token: string): Promise<IDecodedToken> => {
     return jwt.verify(token, process.env.ACCESS_TOKEN_SECRET as Secret) as IDecodedToken;
 };
@@ -90,49 +95,58 @@ export const verifyRefreshToken = async (token: string): Promise<IDecodedToken> 
 // Main token handling function
 export const sendToken = async (user: IUser, statusCode: number, res: Response) => {
     try {
-        const accessToken = generateAccessToken(user);
-        const refreshToken = generateRefreshToken(user);
-
-        // Create session data
-        const sessionData: IUserSession = {
-            user_id: user._id.toString(),
-            role: user.role,
-            email: user.email,
-            lastActive: new Date(),
-        };
-
-        // Store user session in Redis with proper type handling
-        await redis.set(
-            `user_${user._id.toString()}`,
-            JSON.stringify(sessionData),
-            'EX',
-            refreshTokenExpire * 60
-        );
-
-        // Set secure cookies
-        res.cookie("access_token", accessToken, accessTokenOptions);
-        res.cookie("refresh_token", refreshToken, refreshTokenOptions);
-
-        // Remove sensitive information from user object
-        const userResponse = {
-            _id: user._id,
-            email: user.email,
-            role: user.role,
-            isVerified: user.isVerified,
-            isActive: user.isActive,
-            avatar: user.avatar,
-            lastActive: user.lastActive,
-        };
-
-        res.status(statusCode).json({
-            success: true,
-            user: userResponse,
-            accessToken,
-        });
+      const accessToken = generateAccessToken(user);
+      const refreshToken = generateRefreshToken(user);
+  
+      // Session data
+      const sessionData: IUserSession = {
+        user_id: user._id.toString(),
+        role: user.role,
+        email: user.email,
+        lastActive: new Date(),
+      };
+  
+      // Store in Redis with proper expiry
+      await redis.set(
+        `user_${user._id.toString()}`,
+        JSON.stringify(sessionData),
+        'EX',
+        refreshTokenExpire * 60
+      );
+  
+      // Set cookies with proper options
+      res.cookie("access_token", accessToken, {
+        ...accessTokenOptions,
+        sameSite: 'none',
+        secure: true
+      });
+  
+      res.cookie("refresh_token", refreshToken, {
+        ...refreshTokenOptions,
+        sameSite: 'none',
+        secure: true
+      });
+  
+      // Response object
+      const userResponse = {
+        _id: user._id,
+        email: user.email,
+        role: user.role,
+        isVerified: user.isVerified,
+        isActive: user.isActive,
+        avatar: user.avatar,
+        lastActive: user.lastActive,
+      };
+  
+      res.status(statusCode).json({
+        success: true,
+        user: userResponse,
+        accessToken,
+      });
     } catch (error) {
-        throw new Error("Error in token generation: " + error);
+      throw new Error("Error in token generation: " + error);
     }
-};
+  };
 
 // Refresh token function
 export const refreshAccessToken = async (refreshToken: string): Promise<string> => {
@@ -146,7 +160,7 @@ export const refreshAccessToken = async (refreshToken: string): Promise<string> 
 
         const sessionData = JSON.parse(userSession) as IUserSession;
         
-        // Create a minimal user object with required properties
+        
         const user = {
             _id: new Types.ObjectId(sessionData.user_id),
             role: sessionData.role,
@@ -167,7 +181,6 @@ export const clearTokens = async (userId: string | Types.ObjectId, res: Response
         // Clear Redis session
         await redis.del(`user_${userIdString}`);
         
-        // Clear cookies by setting them to empty and expiring them immediately
         res.cookie("access_token", "", {
             maxAge: 1,
             httpOnly: true,
