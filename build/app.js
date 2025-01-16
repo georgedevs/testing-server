@@ -15,28 +15,27 @@ const bookingRoute_1 = __importDefault(require("./routes/bookingRoute"));
 const sessionRoute_1 = __importDefault(require("./routes/sessionRoute"));
 const allowedOrigins = [
     'https://testing-george.vercel.app',
-    'https://testing-george.vercel.app/',
-    'https://www.testing-george.vercel.app',
-    'https://www.testing-george.vercel.app/'
 ];
 //body parser
 exports.app.use(express_1.default.json({ limit: "50mb" }));
 exports.app.use((0, cookie_parser_1.default)());
 //cookie parser
 exports.app.set('trust proxy', 1);
+// CORS - Cross-Origin Resource Sharing
 exports.app.use((0, cors_1.default)({
     origin: function (origin, callback) {
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin)
+            return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            return callback(new Error(msg), false);
         }
-        else {
-            callback(new Error('Not allowed by CORS'));
-        }
+        return callback(null, true);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'device-id'],
-    exposedHeaders: ['set-cookie']
 }));
 exports.app.use((req, res, next) => {
     res.setHeader('Permissions-Policy', 'interest-cohort=()'); // Opt out of FLoC
