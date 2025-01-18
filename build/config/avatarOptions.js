@@ -1,166 +1,119 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.avatarOptions = void 0;
-// Helper function to generate DiceBear URL
-const getDiceBearUrl = (style, seed, options = {}) => {
-    const optionsString = Object.entries(options)
-        .map(([key, value]) => `&${key}=${value}`)
-        .join('');
-    return `https://api.dicebear.com/7.x/${style}/svg?seed=${seed}${optionsString}`;
-};
-// Avatar configuration using DiceBear
 exports.avatarOptions = {
     male: [
         {
-            id: 'male-personas-professional',
-            label: 'Business Professional',
+            id: 'male-pixel-art-1',
+            label: 'Pixel Art Style',
             category: 'male',
-            imageUrl: getDiceBearUrl('personas', 'mp1', {
-                backgroundColor: '#F5F7FA',
-                mood: ['happy'],
-                hair: ['short', 'crew'],
-                accessories: ['glasses'],
-            })
+            imageUrl: 'https://api.dicebear.com/9.x/pixel-art/svg?seed=Adrian'
         },
         {
-            id: 'male-personas-casual',
-            label: 'Business Casual',
+            id: 'male-avataaars-1',
+            label: 'Modern Avatar',
             category: 'male',
-            imageUrl: getDiceBearUrl('personas', 'mp2', {
-                backgroundColor: '#F5F7FA',
-                mood: ['calm'],
-                hair: ['shortCombover', 'shortWaved'],
-            })
+            imageUrl: 'https://api.dicebear.com/9.x/avataaars/svg?seed=Chase'
         },
         {
-            id: 'male-notionists-modern',
-            label: 'Modern Professional',
+            id: 'male-lorelei-1',
+            label: 'Artistic Style',
             category: 'male',
-            imageUrl: getDiceBearUrl('notionists', 'mp3', {
-                backgroundColor: '#F8FAFC',
-                style: 'circle'
-            })
+            imageUrl: 'https://api.dicebear.com/9.x/lorelei/svg?seed=Avery'
         },
         {
-            id: 'male-micah-minimal',
-            label: 'Minimal Style',
+            id: 'male-notionists-1',
+            label: 'Professional 1',
             category: 'male',
-            imageUrl: getDiceBearUrl('micah', 'mp4', {
-                backgroundColor: '#F8FAFC',
-                baseColor: ['navy', 'indigo']
-            })
+            imageUrl: 'https://api.dicebear.com/9.x/notionists/svg?seed=George'
         },
         {
-            id: 'male-avataaars-corporate',
-            label: 'Corporate Style',
+            id: 'male-notionists-2',
+            label: 'Professional 2',
             category: 'male',
-            imageUrl: getDiceBearUrl('avataaars', 'mp5', {
-                backgroundColor: '#F5F7FA',
-                top: ['shortHair', 'straightHair'],
-                accessories: ['round'],
-                clothingColor: ['blue', 'black', 'gray']
-            })
+            imageUrl: 'https://api.dicebear.com/9.x/notionists/svg?seed=Chase'
         },
+        {
+            id: 'male-notionists-3',
+            label: 'Professional 3',
+            category: 'male',
+            imageUrl: 'https://api.dicebear.com/9.x/notionists/svg?seed=Caleb'
+        }
     ],
     female: [
         {
-            id: 'female-personas-professional',
-            label: 'Business Professional',
+            id: 'female-pixel-art-1',
+            label: 'Pixel Art Style',
             category: 'female',
-            imageUrl: getDiceBearUrl('personas', 'fp1', {
-                backgroundColor: '#F5F7FA',
-                mood: ['happy'],
-                hair: ['long', 'bob'],
-                accessories: ['glasses']
-            })
+            imageUrl: 'https://api.dicebear.com/9.x/pixel-art/svg?seed=Wyatt'
         },
         {
-            id: 'female-personas-casual',
-            label: 'Business Casual',
+            id: 'female-avataaars-1',
+            label: 'Modern Avatar',
             category: 'female',
-            imageUrl: getDiceBearUrl('personas', 'fp2', {
-                backgroundColor: '#F5F7FA',
-                mood: ['calm'],
-                hair: ['medium', 'shoulder']
-            })
+            imageUrl: 'https://api.dicebear.com/9.x/avataaars/svg?seed=Katherine'
         },
         {
-            id: 'female-notionists-modern',
-            label: 'Modern Professional',
+            id: 'female-lorelei-1',
+            label: 'Artistic Style',
             category: 'female',
-            imageUrl: getDiceBearUrl('notionists', 'fp3', {
-                backgroundColor: '#F8FAFC',
-                style: 'circle'
-            })
+            imageUrl: 'https://api.dicebear.com/9.x/lorelei/svg?seed=Caleb'
         },
         {
-            id: 'female-micah-minimal',
-            label: 'Minimal Style',
+            id: 'female-notionists-1',
+            label: 'Professional 1',
             category: 'female',
-            imageUrl: getDiceBearUrl('micah', 'fp4', {
-                backgroundColor: '#F8FAFC',
-                baseColor: ['navy', 'indigo']
-            })
+            imageUrl: 'https://api.dicebear.com/9.x/notionists/svg?seed=Leah'
         },
         {
-            id: 'female-avataaars-corporate',
-            label: 'Corporate Style',
+            id: 'female-notionists-2',
+            label: 'Professional 2',
             category: 'female',
-            imageUrl: getDiceBearUrl('avataaars', 'fp5', {
-                backgroundColor: '#F5F7FA',
-                top: ['longHair', 'straightHair'],
-                accessories: ['round'],
-                clothingColor: ['blue', 'black', 'gray']
-            })
+            imageUrl: 'https://api.dicebear.com/9.x/notionists/svg?seed=Sophia'
+        },
+        {
+            id: 'female-notionists-3',
+            label: 'Professional 3',
+            category: 'female',
+            imageUrl: 'https://api.dicebear.com/9.x/notionists/svg?seed=Liliana'
         }
     ],
     neutral: [
         {
-            id: 'neutral-initials-corporate',
-            label: 'Corporate Initials',
+            id: 'neutral-bottts-1',
+            label: 'Abstract 1',
             category: 'neutral',
-            imageUrl: getDiceBearUrl('initials', 'n1', {
-                backgroundColor: '#F5F7FA',
-                bold: true
-            })
+            imageUrl: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=George'
         },
         {
-            id: 'neutral-shapes-minimal',
-            label: 'Minimal Shapes',
+            id: 'neutral-bottts-2',
+            label: 'Abstract 2',
             category: 'neutral',
-            imageUrl: getDiceBearUrl('shapes', 'n2', {
-                backgroundColor: '#F8FAFC',
-                colors: ['blue', 'indigo'],
-                shape1: ['circle'],
-                shape2: ['square'],
-                shape3: ['triangle']
-            })
+            imageUrl: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=Leah'
         },
         {
-            id: 'neutral-marble-elegant',
-            label: 'Elegant Marble',
+            id: 'neutral-bottts-3',
+            label: 'Abstract 3',
             category: 'neutral',
-            imageUrl: getDiceBearUrl('marble', 'n3', {
-                backgroundColor: '#F5F7FA'
-            })
+            imageUrl: 'https://api.dicebear.com/9.x/bottts-neutral/svg?seed=Mason'
         },
         {
-            id: 'neutral-rings-professional',
-            label: 'Professional Rings',
+            id: 'neutral-identicon-1',
+            label: 'Geometric 1',
             category: 'neutral',
-            imageUrl: getDiceBearUrl('rings', 'n4', {
-                backgroundColor: '#F8FAFC',
-                colors: ['blue', 'indigo']
-            })
+            imageUrl: 'https://api.dicebear.com/9.x/identicon/svg?seed=Emery'
         },
         {
-            id: 'neutral-identicon-modern',
-            label: 'Modern Geometric',
+            id: 'neutral-identicon-2',
+            label: 'Geometric 2',
             category: 'neutral',
-            imageUrl: getDiceBearUrl('identicon', 'n5', {
-                backgroundColor: '#F5F7FA',
-                colors: ['blue', 'indigo']
-            })
+            imageUrl: 'https://api.dicebear.com/9.x/identicon/svg?seed=George'
+        },
+        {
+            id: 'neutral-identicon-3',
+            label: 'Geometric 3',
+            category: 'neutral',
+            imageUrl: 'https://api.dicebear.com/9.x/identicon/svg?seed=Christopher'
         }
     ]
 };
