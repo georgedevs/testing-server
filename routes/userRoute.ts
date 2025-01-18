@@ -14,7 +14,7 @@ userRouter.post('/login',deviceCheck,loginUser)
 
 userRouter.post("/logout", isAuthenticated, logoutUser);
 
-userRouter.get('/post', updateAccessToken)
+userRouter.post('/refresh', updateAccessToken)
 
 userRouter.post('/social-auth', googleAuth)
 

@@ -14,7 +14,7 @@ userRouter.post('/registration', rateLimit_1.registrationLimiter, userController
 userRouter.post('/activation', userController_1.activateUser);
 userRouter.post('/login', deviceCheck_1.deviceCheck, userController_1.loginUser);
 userRouter.post("/logout", auth_1.isAuthenticated, userController_1.logoutUser);
-userRouter.get('/post', userController_1.updateAccessToken);
+userRouter.post('/refresh', userController_1.updateAccessToken);
 userRouter.post('/social-auth', userController_1.googleAuth);
 userRouter.get('/me', auth_1.isAuthenticated, userController_1.getUserInfo);
 userRouter.put('/update-password', auth_1.isAuthenticated, userController_1.updatePassword);
