@@ -82,8 +82,11 @@ const meetingSchema = new mongoose_1.Schema({
     adminAssignedAt: Date,
     counselorResponseDeadline: Date,
     autoExpireAt: {
-        type: Date,
-        index: { expires: 0 }
+        type: Date
+    },
+    isExpired: {
+        type: Boolean,
+        default: false
     },
     dailyRoomName: {
         type: String,
@@ -100,5 +103,28 @@ const meetingSchema = new mongoose_1.Schema({
     }
 }, {
     timestamps: true
+});
+// Add middleware to check and update isExpired status
+meetingSchema.pre('save', function (next) {
+    if (this.autoExpireAt && new Date() > this.autoExpireAt) {
+        this.isExpired = true;
+    }
+    next();
+});
+// Add middleware to filter out expired meetings in certain states
+meetingSchema.pre('find', function (next) {
+    // Only filter out expired meetings that are in pending states
+    const pendingStates = ['request_pending', 'counselor_assigned', 'time_selected'];
+    const currentQuery = this.getQuery();
+    if (!currentQuery.status || (Array.isArray(currentQuery.status) &&
+        currentQuery.status.some((s) => pendingStates.includes(s)))) {
+        this.where({
+            $or: [
+                { isExpired: { $ne: true } },
+                { status: { $nin: pendingStates } }
+            ]
+        });
+    }
+    next();
 });
 exports.Meeting = mongoose_1.default.model('Meeting', meetingSchema);
