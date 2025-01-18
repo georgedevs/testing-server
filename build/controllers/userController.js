@@ -331,7 +331,6 @@ exports.updateAccessToken = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, 
         await redis_1.redis.set(redisKey, JSON.stringify({ ...userData }), 'EX', 7 * 24 * 60 * 60 // 7 days in seconds
         );
         // Set new cookies
-        res.cookie("access_token", accessToken, jwt_1.accessTokenOptions);
         res.cookie("refresh_token", refreshToken, jwt_1.refreshTokenOptions);
         res.status(200).json({
             success: true,

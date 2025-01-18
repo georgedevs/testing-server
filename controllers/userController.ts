@@ -6,7 +6,7 @@ import jwt, { JwtPayload, Secret } from "jsonwebtoken";
 import ejs from "ejs";
 import path from "path";
 import sendMail from "../utils/sendMail";
-import { accessTokenOptions, clearTokens, generateAccessToken, generateRefreshToken, refreshTokenOptions, sendToken } from "../utils/jwt";
+import {clearTokens, generateAccessToken, generateRefreshToken, refreshTokenOptions, sendToken } from "../utils/jwt";
 import { redis } from "../utils/redis";
 import { Types } from "mongoose";
 import { avatarOptions } from "../config/avatarOptions";
@@ -434,7 +434,6 @@ export const logoutUser = CatchAsyncError(
           );
 
           // Set new cookies
-          res.cookie("access_token", accessToken, accessTokenOptions);
           res.cookie("refresh_token", refreshToken, refreshTokenOptions);
 
           res.status(200).json({
