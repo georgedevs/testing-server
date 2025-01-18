@@ -6,7 +6,7 @@ import jwt, { JwtPayload, Secret } from "jsonwebtoken";
 import ejs from "ejs";
 import path from "path";
 import sendMail from "../utils/sendMail";
-import {clearTokens, generateAccessToken, generateRefreshToken, refreshTokenOptions, sendToken } from "../utils/jwt";
+import {clearTokens, generateAccessToken, generateRefreshToken, sendToken } from "../utils/jwt";
 import { redis } from "../utils/redis";
 import { Types } from "mongoose";
 import { avatarOptions } from "../config/avatarOptions";
@@ -280,8 +280,7 @@ export const loginUser = CatchAsyncError(
       
       if (!req.deviceId) {
         return next(new ErrorHandler("Device ID not found", 400));
-    }
-
+      }
 
       // Validation
       if (!email || !password) {
@@ -313,39 +312,69 @@ export const loginUser = CatchAsyncError(
         return next(new ErrorHandler("Invalid email or password", 401));
       }
 
+      // Generate tokens
+      const accessToken = generateAccessToken(user);
+      const refreshToken = generateRefreshToken(user);
+
+      // Create session
       await SessionManager.createSession(user._id.toString(), req.deviceId);
+      
       // Update last active timestamp
       user.lastActive = new Date();
-      await user.save();
 
-     // For admin users, update last login
-     if (user.role === "admin") {
-      await User.findByIdAndUpdate(user._id, {
+      // For admin users, update last login
+      if (user.role === "admin") {
+        await User.findByIdAndUpdate(user._id, {
           $set: { lastLogin: new Date() },
           $push: {
-              activityLog: {
-                  action: "login",
-                  timestamp: new Date(),
-                  details: `Login from ${req.ip} with device ${req.deviceId}`,
-              },
+            activityLog: {
+              action: "login",
+              timestamp: new Date(),
+              details: `Login from ${req.ip} with device ${req.deviceId}`,
+            },
           },
-      });
-  }
+        });
+      }
 
-       // Send login notification
-       user.notifications.push({
+      // Send login notification
+      user.notifications.push({
         title: "New Login",
         message: `New login detected from ${req.ip} with device ${req.deviceId}`,
         type: "system",
         read: false,
         createdAt: new Date(),
-    });
-      
+      });
+
+      // Store session in Redis
+      await redis.set(
+        `user_${user._id.toString()}`,
+        JSON.stringify({
+          user_id: user._id.toString(),
+          role: user.role,
+          email: user.email,
+          lastActive: new Date(),
+        }),
+        'EX',
+        7 * 24 * 60 * 60 // 7 days
+      );
 
       await user.save();
 
-      // Send token response
-      sendToken(user, 200, res);
+      // Send response with tokens
+      res.status(200).json({
+        success: true,
+        user: {
+          _id: user._id,
+          email: user.email,
+          role: user.role,
+          isVerified: user.isVerified,
+          isActive: user.isActive,
+          avatar: user.avatar,
+          lastActive: user.lastActive,
+        },
+        accessToken,
+        refreshToken,
+      });
     } catch (error: any) {
       return next(new ErrorHandler(error.message, 500));
     }
@@ -354,43 +383,45 @@ export const loginUser = CatchAsyncError(
 
 
 export const logoutUser = CatchAsyncError(
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const user = req.user;
-  
-        if (user) {
-          await SessionManager.removeSession(user._id.toString());
-          // For admin users, log the logout action
-          if (user.role === "admin") {
-            await User.findByIdAndUpdate(user._id, {
-              $push: {
-                activityLog: {
-                  action: "logout",
-                  timestamp: new Date(),
-                  details: `Logout from ${req.ip}`,
-                },
-              },
-            });
-          }
-  
-          // Update last active timestamp
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = req.user;
+
+      if (user) {
+        // Remove session
+        await SessionManager.removeSession(user._id.toString());
+        
+        // For admin users, log the logout action
+        if (user.role === "admin") {
           await User.findByIdAndUpdate(user._id, {
-            lastActive: new Date()
+            $push: {
+              activityLog: {
+                action: "logout",
+                timestamp: new Date(),
+                details: `Logout from ${req.ip}`,
+              },
+            },
           });
-  
-          // Clear both tokens and Redis session
-          await clearTokens(user._id, res);
         }
-  
-        res.status(200).json({
-          success: true,
-          message: "Logged out successfully"
+
+        // Update last active timestamp
+        await User.findByIdAndUpdate(user._id, {
+          lastActive: new Date()
         });
-      } catch (error: any) {
-        return next(new ErrorHandler(error.message, 500));
+
+        // Clear Redis session
+        await redis.del(`user_${user._id.toString()}`);
       }
+
+      res.status(200).json({
+        success: true,
+        message: "Logged out successfully"
+      });
+    } catch (error: any) {
+      return next(new ErrorHandler(error.message, 500));
     }
-  );
+  }
+);
 
  // Update access token controller
  export const updateAccessToken = CatchAsyncError(
@@ -433,8 +464,6 @@ export const logoutUser = CatchAsyncError(
               7 * 24 * 60 * 60 // 7 days in seconds
           );
 
-          // Set new cookies
-          res.cookie("refresh_token", refreshToken, refreshTokenOptions);
 
           res.status(200).json({
               success: true,
@@ -1044,7 +1073,7 @@ export const updateAvatar = CatchAsyncError(
         // Clear user sessions
         const redisKey = userId.toString();
         await redis.del(redisKey);
-        await clearTokens(userId, res);
+        await clearTokens(userId);
 
            await SessionManager.removeSession(userId.toString());
   

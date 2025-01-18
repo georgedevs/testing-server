@@ -240,10 +240,13 @@ exports.loginUser = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, nex
         if (!isPasswordMatch) {
             return next(new errorHandler_1.default("Invalid email or password", 401));
         }
+        // Generate tokens
+        const accessToken = (0, jwt_1.generateAccessToken)(user);
+        const refreshToken = (0, jwt_1.generateRefreshToken)(user);
+        // Create session
         await sessionManager_1.SessionManager.createSession(user._id.toString(), req.deviceId);
         // Update last active timestamp
         user.lastActive = new Date();
-        await user.save();
         // For admin users, update last login
         if (user.role === "admin") {
             await userModel_1.User.findByIdAndUpdate(user._id, {
@@ -265,9 +268,30 @@ exports.loginUser = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, nex
             read: false,
             createdAt: new Date(),
         });
+        // Store session in Redis
+        await redis_1.redis.set(`user_${user._id.toString()}`, JSON.stringify({
+            user_id: user._id.toString(),
+            role: user.role,
+            email: user.email,
+            lastActive: new Date(),
+        }), 'EX', 7 * 24 * 60 * 60 // 7 days
+        );
         await user.save();
-        // Send token response
-        (0, jwt_1.sendToken)(user, 200, res);
+        // Send response with tokens
+        res.status(200).json({
+            success: true,
+            user: {
+                _id: user._id,
+                email: user.email,
+                role: user.role,
+                isVerified: user.isVerified,
+                isActive: user.isActive,
+                avatar: user.avatar,
+                lastActive: user.lastActive,
+            },
+            accessToken,
+            refreshToken,
+        });
     }
     catch (error) {
         return next(new errorHandler_1.default(error.message, 500));
@@ -277,6 +301,7 @@ exports.logoutUser = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, ne
     try {
         const user = req.user;
         if (user) {
+            // Remove session
             await sessionManager_1.SessionManager.removeSession(user._id.toString());
             // For admin users, log the logout action
             if (user.role === "admin") {
@@ -294,8 +319,8 @@ exports.logoutUser = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, ne
             await userModel_1.User.findByIdAndUpdate(user._id, {
                 lastActive: new Date()
             });
-            // Clear both tokens and Redis session
-            await (0, jwt_1.clearTokens)(user._id, res);
+            // Clear Redis session
+            await redis_1.redis.del(`user_${user._id.toString()}`);
         }
         res.status(200).json({
             success: true,
@@ -330,8 +355,6 @@ exports.updateAccessToken = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, 
         // Update Redis session with 7 days expiry (same as refresh token)
         await redis_1.redis.set(redisKey, JSON.stringify({ ...userData }), 'EX', 7 * 24 * 60 * 60 // 7 days in seconds
         );
-        // Set new cookies
-        res.cookie("refresh_token", refreshToken, jwt_1.refreshTokenOptions);
         res.status(200).json({
             success: true,
             accessToken,
@@ -791,7 +814,7 @@ exports.deleteAccount = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res,
         // Clear user sessions
         const redisKey = userId.toString();
         await redis_1.redis.del(redisKey);
-        await (0, jwt_1.clearTokens)(userId, res);
+        await (0, jwt_1.clearTokens)(userId);
         await sessionManager_1.SessionManager.removeSession(userId.toString());
         // Delete the user account
         await userModel_1.User.findByIdAndDelete(userId);

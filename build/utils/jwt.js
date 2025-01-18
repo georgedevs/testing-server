@@ -3,24 +3,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.clearTokens = exports.sendToken = exports.generateRefreshToken = exports.generateAccessToken = exports.refreshTokenOptions = void 0;
+exports.clearTokens = exports.sendToken = exports.generateRefreshToken = exports.generateAccessToken = void 0;
 const redis_1 = require("./redis");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-// Only refresh token gets cookie options now
-exports.refreshTokenOptions = {
-    expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-    httpOnly: true,
-    sameSite: 'none',
-    secure: true,
-};
-// Token generation functions remain similar
+// Token generation functions
 const generateAccessToken = (user) => {
     return jsonwebtoken_1.default.sign({
         id: user._id.toString(),
         role: user.role
-    }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '15m' } // Shorter expiry for access token
-    );
+    }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
 };
 exports.generateAccessToken = generateAccessToken;
 const generateRefreshToken = (user) => {
@@ -30,12 +21,12 @@ const generateRefreshToken = (user) => {
     }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '7d' });
 };
 exports.generateRefreshToken = generateRefreshToken;
-// Modified sendToken function
+// Modified sendToken function - now returns tokens in response body
 const sendToken = async (user, statusCode, res) => {
     try {
         const accessToken = (0, exports.generateAccessToken)(user);
         const refreshToken = (0, exports.generateRefreshToken)(user);
-        // Store user session in Redis
+        // Store session in Redis
         const sessionData = {
             user_id: user._id.toString(),
             role: user.role,
@@ -44,8 +35,6 @@ const sendToken = async (user, statusCode, res) => {
         };
         await redis_1.redis.set(`user_${user._id.toString()}`, JSON.stringify(sessionData), 'EX', 7 * 24 * 60 * 60 // 7 days
         );
-        // Set only refresh token in HTTP-only cookie
-        res.cookie("refresh_token", refreshToken, exports.refreshTokenOptions);
         // Remove sensitive information from user object
         const userResponse = {
             _id: user._id,
@@ -56,11 +45,12 @@ const sendToken = async (user, statusCode, res) => {
             avatar: user.avatar,
             lastActive: user.lastActive,
         };
-        // Send access token in response body
+        // Send both tokens in response body
         res.status(statusCode).json({
             success: true,
             user: userResponse,
             accessToken,
+            refreshToken
         });
     }
     catch (error) {
@@ -68,21 +58,11 @@ const sendToken = async (user, statusCode, res) => {
     }
 };
 exports.sendToken = sendToken;
-// Modified token cleanup function
-const clearTokens = async (userId, res) => {
+// Modified clearTokens function
+const clearTokens = async (userId) => {
     try {
         const userIdString = userId.toString();
-        // Clear Redis session
         await redis_1.redis.del(`user_${userIdString}`);
-        // Clear only refresh token cookie
-        res.cookie("refresh_token", "", {
-            maxAge: 1,
-            httpOnly: true,
-            secure: true,
-            sameSite: 'strict',
-            expires: new Date(0)
-        });
-        return true;
     }
     catch (error) {
         throw new Error("Error clearing tokens: " + error.message);
