@@ -427,14 +427,14 @@ export const logoutUser = CatchAsyncError(
  export const updateAccessToken = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
       try {
-          const refresh_token = req.cookies.refresh_token;
+          const { refreshToken } = req.body;
           
-          if (!refresh_token) {
-              return next(new ErrorHandler("No refresh token available", 401));
+          if (!refreshToken) {
+              return next(new ErrorHandler("No refresh token provided", 401));
           }
 
           const decoded = jwt.verify(
-              refresh_token,
+              refreshToken,
               process.env.REFRESH_TOKEN_SECRET as string
           ) as JwtPayload;
 
@@ -444,30 +444,30 @@ export const logoutUser = CatchAsyncError(
 
           // Get user from Redis using string key
           const redisKey = getRedisKey(decoded.id);
-          const user = await redis.get(redisKey);
+          const userSession = await redis.get(redisKey);
           
-          if (!user) {
-              return next(new ErrorHandler("Please login to access this resource", 401));
+          if (!userSession) {
+              return next(new ErrorHandler("Session expired. Please login again", 401));
           }
 
-          const userData = JSON.parse(user);
+          const userData = JSON.parse(userSession);
 
           // Create new tokens
           const accessToken = generateAccessToken(userData);
-          const refreshToken = generateRefreshToken(userData);
+          const newRefreshToken = generateRefreshToken(userData);
 
-          // Update Redis session with 7 days expiry (same as refresh token)
+          // Update Redis session with new expiry
           await redis.set(
               redisKey,
-              JSON.stringify({ ...userData }),
+              JSON.stringify({ ...userData, lastActive: new Date() }),
               'EX',
               7 * 24 * 60 * 60 // 7 days in seconds
           );
 
-
           res.status(200).json({
               success: true,
               accessToken,
+              refreshToken: newRefreshToken,
               user: userData
           });
       } catch (error: any) {

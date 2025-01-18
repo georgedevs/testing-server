@@ -334,30 +334,31 @@ exports.logoutUser = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, ne
 // Update access token controller
 exports.updateAccessToken = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
     try {
-        const refresh_token = req.cookies.refresh_token;
-        if (!refresh_token) {
-            return next(new errorHandler_1.default("No refresh token available", 401));
+        const { refreshToken } = req.body;
+        if (!refreshToken) {
+            return next(new errorHandler_1.default("No refresh token provided", 401));
         }
-        const decoded = jsonwebtoken_1.default.verify(refresh_token, process.env.REFRESH_TOKEN_SECRET);
+        const decoded = jsonwebtoken_1.default.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
         if (!decoded) {
             return next(new errorHandler_1.default("Invalid refresh token", 401));
         }
         // Get user from Redis using string key
         const redisKey = getRedisKey(decoded.id);
-        const user = await redis_1.redis.get(redisKey);
-        if (!user) {
-            return next(new errorHandler_1.default("Please login to access this resource", 401));
+        const userSession = await redis_1.redis.get(redisKey);
+        if (!userSession) {
+            return next(new errorHandler_1.default("Session expired. Please login again", 401));
         }
-        const userData = JSON.parse(user);
+        const userData = JSON.parse(userSession);
         // Create new tokens
         const accessToken = (0, jwt_1.generateAccessToken)(userData);
-        const refreshToken = (0, jwt_1.generateRefreshToken)(userData);
-        // Update Redis session with 7 days expiry (same as refresh token)
-        await redis_1.redis.set(redisKey, JSON.stringify({ ...userData }), 'EX', 7 * 24 * 60 * 60 // 7 days in seconds
+        const newRefreshToken = (0, jwt_1.generateRefreshToken)(userData);
+        // Update Redis session with new expiry
+        await redis_1.redis.set(redisKey, JSON.stringify({ ...userData, lastActive: new Date() }), 'EX', 7 * 24 * 60 * 60 // 7 days in seconds
         );
         res.status(200).json({
             success: true,
             accessToken,
+            refreshToken: newRefreshToken,
             user: userData
         });
     }
