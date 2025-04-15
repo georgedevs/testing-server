@@ -526,29 +526,27 @@ exports.getMeetingToken = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, re
         if (!meeting.meetingDate || !meeting.meetingTime) {
             return next(new errorHandler_1.default('Meeting time not properly set', 400));
         }
-        // Properly parse the meeting date and time
-        // Properly parse the meeting date and time
+        // Properly parse the meeting date and time with timezone awareness
         let meetingDateTime;
         try {
-            // First, explicitly cast meeting.meetingDate to unknown and then to string or Date to avoid the 'never' type issue
-            const meetingDate = meeting.meetingDate;
-            // Handle string date
-            if (meetingDate && typeof meetingDate === 'string') {
-                if (meetingDate.includes('T')) {
+            // Explicitly cast to handle string type checking
+            const meetingDateValue = meeting.meetingDate;
+            if (typeof meetingDateValue === 'string') {
+                if (meetingDateValue.includes('T')) {
                     // It's already an ISO string, extract just the date part
-                    const datePart = meetingDate.split('T')[0];
+                    const datePart = meetingDateValue.split('T')[0];
                     meetingDateTime = new Date(`${datePart}T${meeting.meetingTime}`);
                 }
                 else {
                     // It's a date string without time
-                    meetingDateTime = new Date(`${meetingDate}T${meeting.meetingTime}`);
+                    meetingDateTime = new Date(`${meetingDateValue}T${meeting.meetingTime}`);
                 }
             }
             // Handle Date object
-            else if (meetingDate && meetingDate instanceof Date) {
-                const year = meetingDate.getFullYear();
-                const month = String(meetingDate.getMonth() + 1).padStart(2, '0');
-                const day = String(meetingDate.getDate()).padStart(2, '0');
+            else if (meetingDateValue instanceof Date) {
+                const year = meetingDateValue.getFullYear();
+                const month = String(meetingDateValue.getMonth() + 1).padStart(2, '0');
+                const day = String(meetingDateValue.getDate()).padStart(2, '0');
                 const datePart = `${year}-${month}-${day}`;
                 meetingDateTime = new Date(`${datePart}T${meeting.meetingTime}`);
             }
@@ -563,18 +561,34 @@ exports.getMeetingToken = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, re
             console.error('Error parsing meeting date/time:', error);
             return next(new errorHandler_1.default('Invalid meeting date/time format', 400));
         }
-        // Check if meeting time is valid (within 5 minutes before start time)
+        // Get current time - using server time
         const currentTime = new Date();
-        const timeDifference = meetingDateTime.getTime() - currentTime.getTime();
-        const minutesBeforeMeeting = timeDifference / (1000 * 60);
-        // Add more detailed logging
-        console.log('Meeting datetime:', meetingDateTime);
-        console.log('Current time:', currentTime);
-        console.log('Minutes before meeting:', minutesBeforeMeeting);
-        if (minutesBeforeMeeting > 5) {
-            return next(new errorHandler_1.default('Meeting room is not yet available. Please join 5 minutes before the scheduled time.', 400));
+        // Log for debugging
+        console.log('Meeting timing info:', {
+            meetingDateTime: meetingDateTime.toISOString(),
+            currentServerTime: currentTime.toISOString(),
+            meetingTime: meeting.meetingTime,
+            meetingDate: typeof meeting.meetingDate === 'string'
+                ? meeting.meetingDate
+                : meeting.meetingDate.toISOString()
+        });
+        // Check if meeting time is valid - ADJUSTING for timezone
+        // Session is available 5 minutes before start
+        const sessionStartTime = new Date(meetingDateTime.getTime() - (5 * 60 * 1000));
+        // Session ends 45 minutes after start
+        const sessionEndTime = new Date(meetingDateTime.getTime() + (meeting.meetingDuration * 60 * 1000));
+        console.log('Session window calculation:', {
+            sessionStartTime: sessionStartTime.toISOString(),
+            sessionEndTime: sessionEndTime.toISOString(),
+            currentTime: currentTime.toISOString(),
+            beforeStart: currentTime < sessionStartTime,
+            afterEnd: currentTime > sessionEndTime
+        });
+        if (currentTime < sessionStartTime) {
+            const minutesBeforeMeeting = Math.ceil((sessionStartTime.getTime() - currentTime.getTime()) / (60 * 1000));
+            return next(new errorHandler_1.default(`Meeting room is not yet available. Please join 5 minutes before the scheduled time. (${minutesBeforeMeeting} minutes remaining)`, 400));
         }
-        if (minutesBeforeMeeting < -meeting.meetingDuration) {
+        if (currentTime > sessionEndTime) {
             return next(new errorHandler_1.default('Meeting has already ended', 400));
         }
         const isClient = meeting.clientId.toString() === userId.toString();
