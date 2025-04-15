@@ -616,7 +616,6 @@ function generateTimeSlots(
   return slots;
 }
 
-// New endpoint to get meeting tokens
 // Update this section in your bookingController.ts
 export const getMeetingToken = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
@@ -629,6 +628,7 @@ export const getMeetingToken = CatchAsyncError(
     }
 
     console.log('Getting token for meeting:', meetingId);
+    try {
       const meeting = await Meeting.findOne({
         _id: meetingId,
         status: 'confirmed',
@@ -648,55 +648,101 @@ export const getMeetingToken = CatchAsyncError(
         return next(new ErrorHandler('Meeting room not properly configured', 400));
       }
 
-    if (!meeting.meetingDate || !meeting.meetingTime) {
-      return next(new ErrorHandler('Meeting time not properly set', 400));
+      if (!meeting.meetingDate || !meeting.meetingTime) {
+        return next(new ErrorHandler('Meeting time not properly set', 400));
+      }
+
+      // Properly parse the meeting date and time
+// Properly parse the meeting date and time
+let meetingDateTime: Date;
+try {
+  // First, explicitly cast meeting.meetingDate to unknown and then to string or Date to avoid the 'never' type issue
+  const meetingDate: unknown = meeting.meetingDate;
+  
+  // Handle string date
+  if (meetingDate && typeof meetingDate === 'string') {
+    if (meetingDate.includes('T')) {
+      // It's already an ISO string, extract just the date part
+      const datePart = meetingDate.split('T')[0];
+      meetingDateTime = new Date(`${datePart}T${meeting.meetingTime}`);
+    } else {
+      // It's a date string without time
+      meetingDateTime = new Date(`${meetingDate}T${meeting.meetingTime}`);
     }
+  } 
+  // Handle Date object
+  else if (meetingDate && meetingDate instanceof Date) {
+    const year = meetingDate.getFullYear();
+    const month = String(meetingDate.getMonth() + 1).padStart(2, '0');
+    const day = String(meetingDate.getDate()).padStart(2, '0');
+    const datePart = `${year}-${month}-${day}`;
+    meetingDateTime = new Date(`${datePart}T${meeting.meetingTime}`);
+  } else {
+    throw new Error('Invalid meeting date format');
+  }
 
-    // Check if meeting time is valid (within 5 minutes before start time)
-    const meetingDateTime = new Date(`${meeting.meetingDate.toISOString().split('T')[0]}T${meeting.meetingTime}`);
-    const currentTime = new Date();
-    const timeDifference = meetingDateTime.getTime() - currentTime.getTime();
-    const minutesBeforeMeeting = timeDifference / (1000 * 60);
+  if (isNaN(meetingDateTime.getTime())) {
+    throw new Error('Invalid meeting date/time');
+  }
+} catch (error) {
+  console.error('Error parsing meeting date/time:', error);
+  return next(new ErrorHandler('Invalid meeting date/time format', 400));
+}
 
-    if (minutesBeforeMeeting > 5) {
-      return next(new ErrorHandler('Meeting room is not yet available. Please join 5 minutes before the scheduled time.', 400));
-    }
+      // Check if meeting time is valid (within 5 minutes before start time)
+      const currentTime = new Date();
+      const timeDifference = meetingDateTime.getTime() - currentTime.getTime();
+      const minutesBeforeMeeting = timeDifference / (1000 * 60);
 
-    if (minutesBeforeMeeting < -meeting.meetingDuration) {
-      return next(new ErrorHandler('Meeting has already ended', 400));
-    }
+      // Add more detailed logging
+      console.log('Meeting datetime:', meetingDateTime);
+      console.log('Current time:', currentTime);
+      console.log('Minutes before meeting:', minutesBeforeMeeting);
 
-    const isClient = meeting.clientId.toString() === userId.toString();
-    
-    try {
-      // Create meeting token with anonymous identity
-      const token = await dailyService.createMeetingToken(
-        meeting.dailyRoomName!,
-        isClient,
-        meetingDateTime,
-        meeting.meetingDuration
-      );
+      if (minutesBeforeMeeting > 5) {
+        return next(new ErrorHandler('Meeting room is not yet available. Please join 5 minutes before the scheduled time.', 400));
+      }
 
-      // Return meeting access details
-      res.status(200).json({
-        success: true,
-        token,
-        roomUrl: meeting.dailyRoomUrl,
-        joinAs: isClient ? 'Anonymous Client' : 'Anonymous Counselor',
-        meetingDuration: meeting.meetingDuration,
-        meetingDateTime: meetingDateTime,
-        meetingInstructions: {
-          1: "Join 5 minutes before the scheduled time",
-          2: "Ensure you're in a quiet, private space",
-          3: "Your audio will be enabled by default",
-          4: "Video will remain disabled for anonymity",
-          5: "Chat feature is available if needed",
-          6: "Session will automatically end after 45 minutes",
-          7: "If you experience technical issues, use the chat feature",
-        }
-      });
+      if (minutesBeforeMeeting < -meeting.meetingDuration) {
+        return next(new ErrorHandler('Meeting has already ended', 400));
+      }
+
+      const isClient = meeting.clientId.toString() === userId.toString();
+      
+      try {
+        // Create meeting token with anonymous identity
+        const token = await dailyService.createMeetingToken(
+          meeting.dailyRoomName!,
+          isClient,
+          meetingDateTime,
+          meeting.meetingDuration
+        );
+
+        // Return meeting access details
+        res.status(200).json({
+          success: true,
+          token,
+          roomUrl: meeting.dailyRoomUrl,
+          joinAs: isClient ? 'Anonymous Client' : 'Anonymous Counselor',
+          meetingDuration: meeting.meetingDuration,
+          meetingDateTime: meetingDateTime,
+          meetingInstructions: {
+            1: "Join 5 minutes before the scheduled time",
+            2: "Ensure you're in a quiet, private space",
+            3: "Your audio will be enabled by default",
+            4: "Video will remain disabled for anonymity",
+            5: "Chat feature is available if needed",
+            6: "Session will automatically end after 45 minutes",
+            7: "If you experience technical issues, use the chat feature",
+          }
+        });
+      } catch (error) {
+        console.error('Failed to create meeting token:', error);
+        return next(new ErrorHandler('Failed to create meeting token', 500));
+      }
     } catch (error) {
-      return next(new ErrorHandler('Failed to create meeting token', 500));
+      console.error('Error in getMeetingToken:', error);
+      return next(new ErrorHandler('An unexpected error occurred', 500));
     }
   }
 );
