@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initSocketEvents = exports.initSocketServer = void 0;
-// src/socketServer.ts
+// socketServer.ts
 const socket_io_1 = require("socket.io");
 const initSocketServer = (server) => {
     const io = new socket_io_1.Server(server, {
@@ -100,6 +100,16 @@ const initSocketEvents = (io) => {
             notifyUser(userId, 'meeting_cancelled', data);
             notifyCounselor(counselorId, 'meeting_cancelled', data);
             notifyAdmin('admin_update', { type: 'cancellation', userId, counselorId });
+        },
+        // New events for participant tracking
+        emitParticipantStatus: (userId, data = {}) => {
+            notifyUser(userId, 'participant_status', data);
+        },
+        emitGracePeriod: (userId, data = {}) => {
+            notifyUser(userId, 'grace_period', data);
+        },
+        emitSessionCompleted: (userId, data = {}) => {
+            notifyUser(userId, 'session_completed', data);
         },
         emitAdminUpdate: (data = {}) => {
             notifyAdmin('admin_update', data);

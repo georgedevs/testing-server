@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getActiveBooking = exports.getAllFeedback = exports.getAllSessionHistory = exports.getDashboardAnalytics = exports.getAllMeetings = exports.getCounselorFeedback = exports.getSessionRatingStatus = exports.rateSession = exports.getCounselorActiveSession = exports.getCounselorStatistics = exports.getCounselorSessionHistory = exports.getClientSessionHistory = exports.completeMeeting = exports.validateMeetingTime = exports.getMeetingToken = exports.getAvailableTimeSlots = exports.reportNoShow = exports.cancelMeeting = exports.acceptMeeting = exports.selectMeetingTime = exports.assignCounselor = exports.initiateBooking = void 0;
+exports.completeMeetingExtended = exports.getMeetingStatus = exports.participantLeft = exports.participantJoined = exports.getActiveBooking = exports.getAllFeedback = exports.getAllSessionHistory = exports.getDashboardAnalytics = exports.getAllMeetings = exports.getCounselorFeedback = exports.getSessionRatingStatus = exports.rateSession = exports.getCounselorActiveSession = exports.getCounselorStatistics = exports.getCounselorSessionHistory = exports.getClientSessionHistory = exports.completeMeeting = exports.validateMeetingTime = exports.getMeetingToken = exports.getAvailableTimeSlots = exports.reportNoShow = exports.cancelMeeting = exports.acceptMeeting = exports.selectMeetingTime = exports.assignCounselor = exports.initiateBooking = void 0;
 require('dotenv').config();
 const bookingModel_1 = require("../models/bookingModel");
 const userModel_1 = require("../models/userModel");
@@ -16,90 +16,149 @@ const catchAsyncErrors_1 = require("../middleware/catchAsyncErrors");
 const dailyService_1 = require("../utils/dailyService");
 const mongoose_1 = __importDefault(require("mongoose"));
 // 1. Initial Meeting Request   
+// 1. Initial Meeting Request   
 exports.initiateBooking = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
-    const { meetingType, issueDescription, usePreviousCounselor = false } = req.body;
-    const clientId = req.user?._id;
-    // Get client to check for existing counselor
-    const client = await userModel_1.Client.findById(clientId);
-    if (!client) {
-        return next(new errorHandler_1.default('Client not found', 404));
-    }
-    let meetingData = {
-        clientId,
-        meetingType,
-        issueDescription,
-        status: 'request_pending'
-    };
-    // If client has a current counselor and wants to use them
-    if (usePreviousCounselor && client.currentCounselor) {
-        // Verify counselor is still active
-        const counselor = await userModel_1.Counselor.findOne({
-            _id: client.currentCounselor,
-            isActive: true,
-            isAvailable: true
+    try {
+        const { meetingType, issueDescription, usePreviousCounselor = false } = req.body;
+        const clientId = req.user?._id;
+        console.log('Booking Request Received:', {
+            meetingType,
+            clientId,
+            usePreviousCounselor
         });
-        if (counselor) {
-            meetingData = {
-                ...meetingData,
-                counselorId: counselor._id,
-                status: 'counselor_assigned',
-                autoAssigned: true
-            };
+        // Get client to check for existing counselor
+        const client = await userModel_1.Client.findById(clientId);
+        if (!client) {
+            return next(new errorHandler_1.default('Client not found', 404));
         }
-    }
-    const meeting = await bookingModel_1.Meeting.create(meetingData);
-    const socketEvents = req.app.get('socketEvents');
-    // Emit event for admin dashboard update
-    socketEvents.emitAdminUpdate({
-        type: 'new_booking',
-        meetingId: meeting._id,
-        clientId
-    });
-    // If auto-assigned, also notify the counselor
-    if (meetingData.counselorId) {
-        socketEvents.emitCounselorAssigned(meetingData.counselorId.toString(), {
-            title: 'New Client Assignment',
-            message: 'A previous client has requested another session with you',
-            type: 'new_assignment'
+        console.log('Client found with details:', {
+            clientId: client._id,
+            hasCurrentCounselor: !!client.currentCounselor,
+            currentCounselorId: client.currentCounselor
         });
-        // Send email to counselor
-        const counselor = await userModel_1.Counselor.findById(meetingData.counselorId);
-        if (counselor) {
-            await (0, sendMail_1.default)({
-                email: counselor.email,
-                subject: 'New Client Assignment - Returning Client',
-                template: 'counselorAssignment.ejs',
-                data: {
-                    meetingType,
-                    issueDescription,
-                    isReturningClient: true
-                }
-            });
-        }
-    }
-    else {
-        // Regular admin notification for new requests
-        const notification = {
-            title: 'New Meeting Request',
-            message: `New ${meetingType} meeting request from client`,
-            type: 'meeting'
+        let meetingData = {
+            clientId,
+            meetingType,
+            issueDescription,
+            status: 'request_pending'
         };
-        await redis_1.redis.lpush('admin_notifications', JSON.stringify(notification));
-        await (0, sendMail_1.default)({
-            email: process.env.ADMIN_EMAIL || '',
-            subject: 'New Meeting Request',
-            template: 'newMeetingRequest.ejs',
-            data: {
-                meetingType,
-                issueDescription
+        // If client has a current counselor and wants to use them
+        if (usePreviousCounselor && client.currentCounselor) {
+            console.log('Attempting to use previous counselor:', client.currentCounselor);
+            // Verify counselor is still active
+            const counselor = await userModel_1.Counselor.findOne({
+                _id: client.currentCounselor,
+                isActive: true,
+                isAvailable: true
+            });
+            console.log('Previous counselor check result:', {
+                found: !!counselor,
+                isActive: counselor?.isActive,
+                isAvailable: counselor?.isAvailable
+            });
+            if (counselor) {
+                meetingData = {
+                    ...meetingData,
+                    counselorId: counselor._id,
+                    status: 'counselor_assigned',
+                    autoAssigned: true
+                };
+                console.log('Auto-assigned counselor:', {
+                    counselorId: counselor._id,
+                    counselorName: counselor.fullName
+                });
             }
+            else {
+                console.log('Previous counselor not available or not found');
+                // Current counselor not found, inactive, or unavailable
+                // Reset client's currentCounselor field
+                await userModel_1.Client.findByIdAndUpdate(client._id, {
+                    $unset: { currentCounselor: 1 }
+                });
+            }
+        }
+        const meeting = await bookingModel_1.Meeting.create(meetingData);
+        console.log('Meeting created:', {
+            meetingId: meeting._id,
+            status: meeting.status,
+            autoAssigned: meeting.autoAssigned
         });
-        await (0, sendSMS_1.sendSMS)(process.env.ADMIN_PHONE || '', `New ${meetingType} meeting request received. Please check dashboard.`);
+        const socketEvents = req.app.get('socketEvents');
+        // If auto-assigned, notify the counselor but not admin
+        if (meetingData.counselorId) {
+            if (socketEvents) {
+                socketEvents.emitCounselorAssigned(clientId?.toString(), meetingData.counselorId.toString(), {
+                    meetingId: meeting._id,
+                    status: meeting.status,
+                    counselorId: meetingData.counselorId
+                });
+            }
+            // Notify counselor
+            const counselor = await userModel_1.Counselor.findById(meetingData.counselorId);
+            if (counselor) {
+                try {
+                    await (0, sendMail_1.default)({
+                        email: counselor.email,
+                        subject: 'New Client Assignment - Returning Client',
+                        template: 'counselorAssignment.ejs',
+                        data: {
+                            meetingType,
+                            issueDescription,
+                            isReturningClient: true
+                        }
+                    });
+                }
+                catch (emailError) {
+                    console.error('Failed to send email notification to counselor', emailError);
+                }
+            }
+        }
+        else {
+            // Emit event for admin dashboard update if not auto-assigned
+            if (socketEvents) {
+                socketEvents.emitAdminUpdate({
+                    type: 'new_booking',
+                    meetingId: meeting._id,
+                    clientId
+                });
+            }
+            // Regular admin notification for new requests
+            try {
+                const notification = {
+                    title: 'New Meeting Request',
+                    message: `New ${meetingType} meeting request from client`,
+                    type: 'meeting'
+                };
+                await redis_1.redis.lpush('admin_notifications', JSON.stringify(notification));
+                if (process.env.ADMIN_EMAIL) {
+                    await (0, sendMail_1.default)({
+                        email: process.env.ADMIN_EMAIL,
+                        subject: 'New Meeting Request',
+                        template: 'newMeetingRequest.ejs',
+                        data: {
+                            meetingType,
+                            issueDescription
+                        }
+                    });
+                }
+                if (process.env.ADMIN_PHONE) {
+                    await (0, sendSMS_1.sendSMS)(process.env.ADMIN_PHONE, `New ${meetingType} meeting request received. Please check dashboard.`);
+                }
+            }
+            catch (notificationError) {
+                console.error('Failed to send admin notification', notificationError);
+                // Continue even if notification fails
+            }
+        }
+        res.status(201).json({
+            success: true,
+            meeting
+        });
     }
-    res.status(201).json({
-        success: true,
-        meeting
-    });
+    catch (error) {
+        console.error('Error in initiateBooking:', error);
+        return next(new errorHandler_1.default(error.message, 500));
+    }
 });
 // 2. Admin Assigns Counselor
 exports.assignCounselor = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
@@ -634,70 +693,92 @@ const validateMeetingTime = (meetingDate, meetingTime) => {
 exports.validateMeetingTime = validateMeetingTime;
 // Update completeMeeting to handle room cleanup
 exports.completeMeeting = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
-    const { meetingId } = req.params;
-    const { sessionDetails } = req.body;
-    const meeting = await bookingModel_1.Meeting.findById(meetingId);
-    if (!meeting) {
-        return next(new errorHandler_1.default('Meeting not found', 404));
-    }
-    // Calculate session duration and details
-    const sessionData = {
-        duration: sessionDetails?.duration || 0, // Duration in minutes
-        startTime: meeting.meetingDate,
-        endTime: new Date(),
-        meetingType: meeting.meetingType,
-        issueDescription: meeting.issueDescription,
-        status: sessionDetails?.status || 'completed'
-    };
-    // Update client's session history
-    const client = await userModel_1.Client.findById(meeting.clientId);
-    if (client) {
-        // Add to session history
-        client.sessionHistory.push({
+    try {
+        const { meetingId } = req.params;
+        const { sessionDetails } = req.body;
+        const meeting = await bookingModel_1.Meeting.findById(meetingId);
+        if (!meeting) {
+            return next(new errorHandler_1.default('Meeting not found', 404));
+        }
+        console.log('Completing meeting:', {
+            meetingId: meeting._id,
+            clientId: meeting.clientId,
             counselorId: meeting.counselorId,
-            sessionDate: meeting.meetingDate,
-            sessionType: meeting.meetingType,
-            status: 'completed',
-            issueDescription: meeting.issueDescription
+            status: meeting.status
         });
-        // Update current counselor if not set
-        if (!client.currentCounselor) {
+        // Calculate session duration and details
+        const sessionData = {
+            duration: sessionDetails?.duration || 0, // Duration in minutes
+            startTime: meeting.meetingDate,
+            endTime: new Date(),
+            meetingType: meeting.meetingType,
+            issueDescription: meeting.issueDescription,
+            status: sessionDetails?.status || 'completed'
+        };
+        // Update client's session history and current counselor
+        const client = await userModel_1.Client.findById(meeting.clientId);
+        if (client) {
+            console.log('Updating client session history:', {
+                clientId: client._id,
+                currentCounselorBefore: client.currentCounselor,
+                sessionHistory: client.sessionHistory.length
+            });
+            // Add to session history
+            client.sessionHistory.push({
+                counselorId: meeting.counselorId,
+                sessionDate: meeting.meetingDate,
+                sessionType: meeting.meetingType,
+                status: 'completed',
+                issueDescription: meeting.issueDescription
+            });
+            // Update current counselor
+            // Important: Always set the currentCounselor field when completing a session
             client.currentCounselor = meeting.counselorId;
+            console.log('Client updated with new counselor:', {
+                currentCounselorAfter: client.currentCounselor,
+                sessionHistoryLength: client.sessionHistory.length
+            });
+            await client.save();
+            // Update Redis cache
+            await redis_1.redis.del(client._id.toString());
         }
-        await client.save();
-        await redis_1.redis.del(client._id.toString());
+        // Update counselor's statistics
+        const counselor = await userModel_1.Counselor.findById(meeting.counselorId);
+        if (counselor) {
+            counselor.totalSessions += 1;
+            counselor.completedSessions += 1;
+            // Update active clients count if this is a new client
+            const existingSessions = counselor.totalSessions || 0;
+            if (existingSessions === 1) {
+                counselor.activeClients = (counselor.activeClients || 0) + 1;
+            }
+            await counselor.save();
+            await redis_1.redis.del(counselor._id.toString());
+        }
+        // Clean up virtual meeting room if applicable
+        if (meeting.meetingType === 'virtual' && meeting.dailyRoomName) {
+            try {
+                await dailyService_1.dailyService.deleteRoom(meeting.dailyRoomName);
+            }
+            catch (error) {
+                console.error('Failed to delete Daily.co room:', error);
+                // Continue even if room deletion fails
+            }
+        }
+        // Update meeting status
+        meeting.status = 'completed';
+        await meeting.save();
+        // Create detailed session record
+        await createSessionRecord(meeting, sessionData);
+        res.status(200).json({
+            success: true,
+            message: 'Meeting completed and history updated successfully'
+        });
     }
-    // Update counselor's statistics
-    const counselor = await userModel_1.Counselor.findById(meeting.counselorId);
-    if (counselor) {
-        counselor.totalSessions += 1;
-        counselor.completedSessions += 1;
-        // Update active clients count if this is a new client
-        const existingSessions = counselor.totalSessions || 0;
-        if (existingSessions === 1) {
-            counselor.activeClients = (counselor.activeClients || 0) + 1;
-        }
-        await counselor.save();
-        await redis_1.redis.del(counselor._id.toString());
+    catch (error) {
+        console.error('Error in completeMeeting:', error);
+        return next(new errorHandler_1.default(error.message, 500));
     }
-    // Clean up virtual meeting room if applicable
-    if (meeting.meetingType === 'virtual' && meeting.dailyRoomName) {
-        try {
-            await dailyService_1.dailyService.deleteRoom(meeting.dailyRoomName);
-        }
-        catch (error) {
-            console.error('Failed to delete Daily.co room:', error);
-        }
-    }
-    // Update meeting status
-    meeting.status = 'completed';
-    await meeting.save();
-    // Create detailed session record
-    await createSessionRecord(meeting, sessionData);
-    res.status(200).json({
-        success: true,
-        message: 'Meeting completed and history updated successfully'
-    });
 });
 async function createSessionRecord(meeting, sessionDetails) {
     const SessionRecord = mongoose_1.default.model('SessionRecord', new mongoose_1.default.Schema({
@@ -1294,5 +1375,357 @@ exports.getActiveBooking = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, r
     }
     catch (error) {
         next(error);
+    }
+});
+exports.participantJoined = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
+    const { meetingId } = req.params;
+    const userId = req.user?._id;
+    const userRole = req.user?.role;
+    if (!userId) {
+        return next(new errorHandler_1.default('User not authenticated', 401));
+    }
+    const meeting = await bookingModel_1.Meeting.findById(meetingId);
+    if (!meeting) {
+        return next(new errorHandler_1.default('Meeting not found', 404));
+    }
+    // Set the appropriate join status based on role
+    if (userRole === 'client') {
+        meeting.clientJoined = true;
+        meeting.clientLastActive = new Date();
+        // Notify counselor if connected
+        const socketEvents = req.app.get('socketEvents');
+        if (socketEvents && meeting.counselorId) {
+            socketEvents.emitParticipantStatus(meeting.counselorId.toString(), {
+                meetingId: meeting._id.toString(),
+                role: 'client',
+                status: 'joined',
+                timestamp: new Date()
+            });
+        }
+    }
+    else if (userRole === 'counselor') {
+        meeting.counselorJoined = true;
+        meeting.counselorLastActive = new Date();
+        // Notify client if connected
+        const socketEvents = req.app.get('socketEvents');
+        if (socketEvents) {
+            socketEvents.emitParticipantStatus(meeting.clientId.toString(), {
+                meetingId: meeting._id.toString(),
+                role: 'counselor',
+                status: 'joined',
+                timestamp: new Date()
+            });
+        }
+    }
+    // If grace period was active, deactivate it
+    if (meeting.graceActive) {
+        meeting.graceActive = false;
+        meeting.graceEndTime = undefined;
+    }
+    await meeting.save();
+    res.status(200).json({
+        success: true,
+        message: 'Participant status updated',
+        clientJoined: meeting.clientJoined,
+        counselorJoined: meeting.counselorJoined
+    });
+});
+// Track when a participant leaves a session
+exports.participantLeft = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
+    const { meetingId } = req.params;
+    const userId = req.user?._id;
+    const userRole = req.user?.role;
+    const { gracePeriod = true } = req.body;
+    if (!userId) {
+        return next(new errorHandler_1.default('User not authenticated', 401));
+    }
+    const meeting = await bookingModel_1.Meeting.findById(meetingId);
+    if (!meeting) {
+        return next(new errorHandler_1.default('Meeting not found', 404));
+    }
+    // Update last active timestamp based on role
+    if (userRole === 'client') {
+        meeting.clientLastActive = new Date();
+        // Notify counselor if connected
+        const socketEvents = req.app.get('socketEvents');
+        if (socketEvents && meeting.counselorId) {
+            socketEvents.emitParticipantStatus(meeting.counselorId.toString(), {
+                meetingId: meeting._id.toString(),
+                role: 'client',
+                status: 'left',
+                timestamp: new Date()
+            });
+        }
+    }
+    else if (userRole === 'counselor') {
+        meeting.counselorLastActive = new Date();
+        // Notify client if connected
+        const socketEvents = req.app.get('socketEvents');
+        if (socketEvents) {
+            socketEvents.emitParticipantStatus(meeting.clientId.toString(), {
+                meetingId: meeting._id.toString(),
+                role: 'counselor',
+                status: 'left',
+                timestamp: new Date()
+            });
+        }
+    }
+    meeting.lastParticipantLeft = new Date();
+    // Start grace period if both participants had joined
+    if (gracePeriod && meeting.clientJoined && meeting.counselorJoined) {
+        // Set a 5-minute grace period
+        const GRACE_PERIOD_MINUTES = 5;
+        const graceEndTime = new Date();
+        graceEndTime.setMinutes(graceEndTime.getMinutes() + GRACE_PERIOD_MINUTES);
+        meeting.graceActive = true;
+        meeting.graceEndTime = graceEndTime;
+        // Schedule a job to check if session should be marked complete after grace period
+        // Notify about grace period
+        const socketEvents = req.app.get('socketEvents');
+        if (socketEvents) {
+            if (userRole === 'client' && meeting.counselorId) {
+                socketEvents.emitGracePeriod(meeting.counselorId.toString(), {
+                    meetingId: meeting._id.toString(),
+                    graceEndTime: graceEndTime,
+                    participant: 'client'
+                });
+            }
+            else if (userRole === 'counselor') {
+                socketEvents.emitGracePeriod(meeting.clientId.toString(), {
+                    meetingId: meeting._id.toString(),
+                    graceEndTime: graceEndTime,
+                    participant: 'counselor'
+                });
+            }
+        }
+    }
+    else if (!gracePeriod) {
+        // If grace period is explicitly disabled, skip it
+        meeting.graceActive = false;
+    }
+    await meeting.save();
+    res.status(200).json({
+        success: true,
+        message: 'Participant left status updated',
+        graceActive: meeting.graceActive,
+        graceEndTime: meeting.graceEndTime
+    });
+});
+// Check meeting status including participant join history
+exports.getMeetingStatus = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
+    const { meetingId } = req.params;
+    const userId = req.user?._id;
+    if (!userId) {
+        return next(new errorHandler_1.default('User not authenticated', 401));
+    }
+    const meeting = await bookingModel_1.Meeting.findById(meetingId);
+    if (!meeting) {
+        return next(new errorHandler_1.default('Meeting not found', 404));
+    }
+    // Check if the current user has permission to view this meeting
+    const userRole = req.user?.role;
+    let hasPermission = false;
+    if (userRole === 'client' && meeting.clientId.toString() === userId.toString()) {
+        hasPermission = true;
+    }
+    else if (userRole === 'counselor' && meeting.counselorId?.toString() === userId.toString()) {
+        hasPermission = true;
+    }
+    else if (userRole === 'admin') {
+        hasPermission = true;
+    }
+    if (!hasPermission) {
+        return next(new errorHandler_1.default('You do not have permission to view this meeting', 403));
+    }
+    // Calculate if we're in a grace period
+    let gracePeriodRemaining = 0;
+    if (meeting.graceActive && meeting.graceEndTime) {
+        const now = new Date();
+        if (now < meeting.graceEndTime) {
+            gracePeriodRemaining = Math.ceil((meeting.graceEndTime.getTime() - now.getTime()) / 1000);
+        }
+        else {
+            // Grace period has expired
+            meeting.graceActive = false;
+            await meeting.save();
+        }
+    }
+    res.status(200).json({
+        success: true,
+        meeting: {
+            _id: meeting._id,
+            status: meeting.status,
+            clientJoined: meeting.clientJoined,
+            counselorJoined: meeting.counselorJoined,
+            graceActive: meeting.graceActive,
+            gracePeriodRemaining,
+            meetingDate: meeting.meetingDate,
+            meetingTime: meeting.meetingTime,
+            meetingType: meeting.meetingType,
+            meetingDuration: meeting.meetingDuration,
+            clientLastActive: meeting.clientLastActive,
+            counselorLastActive: meeting.counselorLastActive
+        }
+    });
+});
+// Extended complete meeting function to handle participant history
+exports.completeMeetingExtended = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
+    try {
+        const { meetingId } = req.params;
+        const userId = req.user?._id;
+        const userRole = req.user?.role;
+        const { forceComplete = false, sessionDetails } = req.body;
+        if (!userId) {
+            return next(new errorHandler_1.default('User not authenticated', 401));
+        }
+        const meeting = await bookingModel_1.Meeting.findById(meetingId);
+        if (!meeting) {
+            return next(new errorHandler_1.default('Meeting not found', 404));
+        }
+        console.log('Completing meeting extended:', {
+            meetingId: meeting._id,
+            userId,
+            userRole,
+            forceComplete,
+            sessionDetails
+        });
+        // Check if the current user has permission to complete this meeting
+        let hasPermission = false;
+        if (userRole === 'client' && meeting.clientId.toString() === userId.toString()) {
+            hasPermission = true;
+        }
+        else if (userRole === 'counselor' && meeting.counselorId?.toString() === userId.toString()) {
+            hasPermission = true;
+        }
+        else if (userRole === 'admin') {
+            hasPermission = true;
+        }
+        if (!hasPermission) {
+            return next(new errorHandler_1.default('You do not have permission to complete this meeting', 403));
+        }
+        // Determine the appropriate completion status
+        // Explicitly type the completion status to match the IMeeting status type
+        let completionStatus;
+        if (forceComplete) {
+            // Administrator override or other special case
+            completionStatus = 'completed';
+        }
+        else if (meeting.clientJoined && meeting.counselorJoined) {
+            // Both participants joined - normal completion
+            completionStatus = 'completed';
+        }
+        else if (meeting.clientJoined && !meeting.counselorJoined) {
+            // Only client joined
+            completionStatus = 'client_only';
+        }
+        else if (!meeting.clientJoined && meeting.counselorJoined) {
+            // Only counselor joined
+            completionStatus = 'counselor_only';
+        }
+        else {
+            // Neither joined but trying to complete - unusual case
+            completionStatus = 'incomplete';
+        }
+        // For the session record, we need to convert to the ISessionDetails status format
+        // Map our meeting status to session status
+        const sessionStatus = completionStatus === 'completed' ? 'completed' : 'no_show';
+        // Calculate session duration and details with the correct status type
+        const sessionData = {
+            duration: sessionDetails?.duration || meeting.meetingDuration || 45, // Duration in minutes
+            startTime: meeting.meetingDate,
+            endTime: new Date(),
+            meetingType: meeting.meetingType,
+            issueDescription: meeting.issueDescription,
+            status: sessionStatus // Using the properly typed status
+        };
+        // Update client's session history if applicable
+        if (completionStatus !== 'incomplete') {
+            const client = await userModel_1.Client.findById(meeting.clientId);
+            if (client) {
+                console.log('Updating client session history:', {
+                    clientId: client._id,
+                    currentCounselorBefore: client.currentCounselor,
+                    sessionHistoryLength: client.sessionHistory.length
+                });
+                // Add to session history - FIXED: using 'cancelled' instead of 'incomplete'
+                client.sessionHistory.push({
+                    counselorId: meeting.counselorId,
+                    sessionDate: meeting.meetingDate,
+                    sessionType: meeting.meetingType,
+                    status: completionStatus === 'completed' ? 'completed' : 'cancelled',
+                    issueDescription: meeting.issueDescription
+                });
+                // Update current counselor based on completion status
+                if (completionStatus === 'completed' || completionStatus === 'client_only') {
+                    // In cases where the session was completed or only the client showed up,
+                    // we still want to set this counselor as the current one
+                    client.currentCounselor = meeting.counselorId;
+                    console.log('Setting current counselor:', meeting.counselorId);
+                }
+                await client.save();
+                await redis_1.redis.del(client._id.toString());
+                console.log('Client updated with session history:', {
+                    clientId: client._id,
+                    currentCounselorAfter: client.currentCounselor,
+                    sessionHistoryLength: client.sessionHistory.length
+                });
+            }
+        }
+        // Update counselor stats if the counselor joined
+        if (meeting.counselorJoined) {
+            const counselor = await userModel_1.Counselor.findById(meeting.counselorId);
+            if (counselor) {
+                counselor.totalSessions += 1;
+                if (completionStatus === 'completed') {
+                    counselor.completedSessions += 1;
+                }
+                // Update active clients count if this is a new client
+                const existingSessions = counselor.totalSessions || 0;
+                if (existingSessions === 1) {
+                    counselor.activeClients = (counselor.activeClients || 0) + 1;
+                }
+                await counselor.save();
+                await redis_1.redis.del(counselor._id.toString());
+            }
+        }
+        // Clean up virtual meeting room if applicable
+        if (meeting.meetingType === 'virtual' && meeting.dailyRoomName) {
+            try {
+                await dailyService_1.dailyService.deleteRoom(meeting.dailyRoomName);
+            }
+            catch (error) {
+                console.error('Failed to delete Daily.co room:', error);
+            }
+        }
+        // Update meeting status - now correctly typed
+        meeting.status = completionStatus;
+        await meeting.save();
+        // Create detailed session record
+        await createSessionRecord(meeting, sessionData);
+        // Notify other participants
+        const socketEvents = req.app.get('socketEvents');
+        if (socketEvents) {
+            if (userRole === 'client' && meeting.counselorId) {
+                socketEvents.emitSessionCompleted(meeting.counselorId.toString(), {
+                    meetingId: meeting._id.toString(),
+                    status: completionStatus
+                });
+            }
+            else if (userRole === 'counselor') {
+                socketEvents.emitSessionCompleted(meeting.clientId.toString(), {
+                    meetingId: meeting._id.toString(),
+                    status: completionStatus
+                });
+            }
+        }
+        res.status(200).json({
+            success: true,
+            message: 'Meeting completed successfully',
+            status: completionStatus
+        });
+    }
+    catch (err) {
+        console.error('Error ending call:', err);
+        return next(new errorHandler_1.default('Failed to complete meeting properly. Please try again.', 500));
     }
 });

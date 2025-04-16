@@ -10,7 +10,7 @@ import sessionRouter from "./routes/sessionRoute";
 
 const allowedOrigins = [
     'https://testing-george.vercel.app',
-  ];
+      ];
 
 //body parser
 app.use(express.json({limit: "50mb"}))

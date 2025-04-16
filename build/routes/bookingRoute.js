@@ -86,4 +86,8 @@ bookingRouter.get('/meetings', auth_1.isAuthenticated, auth_1.isAdmin, bookingCo
 bookingRouter.get('/analytics', auth_1.isAuthenticated, auth_1.isAdmin, bookingController_1.getDashboardAnalytics);
 bookingRouter.get('/sessions', auth_1.isAuthenticated, auth_1.isAdmin, bookingController_1.getAllSessionHistory);
 bookingRouter.get('/feedback', auth_1.isAuthenticated, auth_1.isAdmin, bookingController_1.getAllFeedback);
+bookingRouter.post('/participant/:meetingId/join', auth_1.isAuthenticated, bookingController_1.participantJoined);
+bookingRouter.post('/participant/:meetingId/leave', auth_1.isAuthenticated, bookingController_1.participantLeft);
+bookingRouter.get('/session/:meetingId/status', auth_1.isAuthenticated, bookingController_1.getMeetingStatus);
+bookingRouter.post('/complete-extended/:meetingId', auth_1.isAuthenticated, bookingController_1.completeMeetingExtended);
 exports.default = bookingRouter;

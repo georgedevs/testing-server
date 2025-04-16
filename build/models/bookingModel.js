@@ -62,7 +62,18 @@ const meetingSchema = new mongoose_1.Schema({
     },
     status: {
         type: String,
-        enum: ['request_pending', 'counselor_assigned', 'time_selected', 'confirmed', 'cancelled', 'completed', 'abandoned'],
+        enum: [
+            'request_pending',
+            'counselor_assigned',
+            'time_selected',
+            'confirmed',
+            'cancelled',
+            'completed',
+            'abandoned',
+            'incomplete',
+            'client_only',
+            'counselor_only'
+        ],
         default: 'request_pending'
     },
     autoAssigned: {
@@ -100,6 +111,31 @@ const meetingSchema = new mongoose_1.Schema({
     meetingDuration: {
         type: Number,
         default: 45
+    },
+    // Participant tracking fields
+    clientJoined: {
+        type: Boolean,
+        default: false
+    },
+    counselorJoined: {
+        type: Boolean,
+        default: false
+    },
+    clientLastActive: {
+        type: Date
+    },
+    counselorLastActive: {
+        type: Date
+    },
+    graceEndTime: {
+        type: Date
+    },
+    graceActive: {
+        type: Boolean,
+        default: false
+    },
+    lastParticipantLeft: {
+        type: Date
     }
 }, {
     timestamps: true
