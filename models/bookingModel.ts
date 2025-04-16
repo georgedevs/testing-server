@@ -9,7 +9,7 @@ export interface IMeeting extends Document {
   issueDescription: string;
   meetingDate?: Date;
   meetingTime?: string;
-  status: 'request_pending' | 'counselor_assigned' | 'time_selected' | 'confirmed' | 'cancelled' | 'completed' | 'abandoned';
+  status: 'request_pending' | 'counselor_assigned' | 'time_selected' | 'confirmed' | 'cancelled' | 'completed' | 'abandoned' | 'incomplete' | 'client_only' | 'counselor_only';
   autoAssigned?: boolean;
   cancellationReason?: string;
   noShowReason?: string;
@@ -25,6 +25,15 @@ export interface IMeeting extends Document {
   dailyRoomUrl?: string;
   dailyToken?: string;
   meetingDuration: number;
+  
+  // Participant tracking
+  clientJoined: boolean;
+  counselorJoined: boolean;
+  clientLastActive?: Date;
+  counselorLastActive?: Date;
+  graceEndTime?: Date;
+  graceActive?: boolean;
+  lastParticipantLeft?: Date;
 }
 
 const meetingSchema = new Schema({
@@ -54,7 +63,18 @@ const meetingSchema = new Schema({
   },
   status: {
     type: String,
-    enum: ['request_pending', 'counselor_assigned', 'time_selected', 'confirmed', 'cancelled', 'completed', 'abandoned'],
+    enum: [
+      'request_pending', 
+      'counselor_assigned', 
+      'time_selected', 
+      'confirmed', 
+      'cancelled', 
+      'completed', 
+      'abandoned',
+      'incomplete',
+      'client_only',
+      'counselor_only'
+    ],
     default: 'request_pending'
   },
   autoAssigned: {
@@ -92,6 +112,32 @@ const meetingSchema = new Schema({
   meetingDuration: {
     type: Number,
     default: 45 
+  },
+  
+  // Participant tracking fields
+  clientJoined: {
+    type: Boolean,
+    default: false
+  },
+  counselorJoined: {
+    type: Boolean,
+    default: false
+  },
+  clientLastActive: {
+    type: Date
+  },
+  counselorLastActive: {
+    type: Date
+  },
+  graceEndTime: {
+    type: Date
+  },
+  graceActive: {
+    type: Boolean,
+    default: false
+  },
+  lastParticipantLeft: {
+    type: Date
   }
 }, {
   timestamps: true

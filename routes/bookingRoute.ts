@@ -1,6 +1,6 @@
 import express from 'express';
 import { isAdmin, isAuthenticated, isCounselor } from '../middleware/auth';
-import { acceptMeeting, assignCounselor, cancelMeeting, completeMeeting, getActiveBooking, getAllFeedback, getAllMeetings, getAllSessionHistory, getAvailableTimeSlots, getClientSessionHistory, getCounselorActiveSession, getCounselorFeedback, getCounselorSessionHistory, getCounselorStatistics, getDashboardAnalytics, getMeetingToken, getSessionRatingStatus, initiateBooking, rateSession, reportNoShow, selectMeetingTime } from '../controllers/bookingController';
+import { acceptMeeting, assignCounselor, cancelMeeting, completeMeeting, getActiveBooking, getAllFeedback, getAllMeetings, getAllSessionHistory, getAvailableTimeSlots, getClientSessionHistory, getCounselorActiveSession, getCounselorFeedback, getCounselorSessionHistory, getCounselorStatistics, getDashboardAnalytics, getMeetingToken, getSessionRatingStatus, initiateBooking, rateSession, reportNoShow, selectMeetingTime, participantJoined, participantLeft, getMeetingStatus, completeMeetingExtended } from '../controllers/bookingController';
 import { Meeting } from '../models/bookingModel';
 
 const bookingRouter = express.Router();
@@ -96,4 +96,9 @@ bookingRouter.get('/analytics', isAuthenticated,isAdmin, getDashboardAnalytics)
 bookingRouter.get('/sessions', isAuthenticated,isAdmin, getAllSessionHistory)
 
 bookingRouter.get('/feedback', isAuthenticated,isAdmin, getAllFeedback)
+
+bookingRouter.post('/participant/:meetingId/join', isAuthenticated, participantJoined);
+bookingRouter.post('/participant/:meetingId/leave', isAuthenticated, participantLeft);
+bookingRouter.get('/session/:meetingId/status', isAuthenticated, getMeetingStatus);
+bookingRouter.post('/complete-extended/:meetingId', isAuthenticated, completeMeetingExtended);
 export default bookingRouter

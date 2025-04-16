@@ -1666,3 +1666,395 @@ export const getActiveBooking = CatchAsyncError(
     }
   }
 );
+
+export const participantJoined = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { meetingId } = req.params;
+    const userId = req.user?._id;
+    const userRole = req.user?.role;
+
+    if (!userId) {
+      return next(new ErrorHandler('User not authenticated', 401));
+    }
+
+    const meeting = await Meeting.findById(meetingId);
+    if (!meeting) {
+      return next(new ErrorHandler('Meeting not found', 404));
+    }
+
+    // Set the appropriate join status based on role
+    if (userRole === 'client') {
+      meeting.clientJoined = true;
+      meeting.clientLastActive = new Date();
+
+      // Notify counselor if connected
+      const socketEvents = req.app.get('socketEvents');
+      if (socketEvents && meeting.counselorId) {
+        socketEvents.emitParticipantStatus(
+          meeting.counselorId.toString(),
+          {
+            meetingId: meeting._id.toString(),
+            role: 'client',
+            status: 'joined',
+            timestamp: new Date()
+          }
+        );
+      }
+    } else if (userRole === 'counselor') {
+      meeting.counselorJoined = true;
+      meeting.counselorLastActive = new Date();
+
+      // Notify client if connected
+      const socketEvents = req.app.get('socketEvents');
+      if (socketEvents) {
+        socketEvents.emitParticipantStatus(
+          meeting.clientId.toString(),
+          {
+            meetingId: meeting._id.toString(),
+            role: 'counselor',
+            status: 'joined',
+            timestamp: new Date()
+          }
+        );
+      }
+    }
+
+    // If grace period was active, deactivate it
+    if (meeting.graceActive) {
+      meeting.graceActive = false;
+      meeting.graceEndTime = undefined;
+    }
+
+    await meeting.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Participant status updated',
+      clientJoined: meeting.clientJoined,
+      counselorJoined: meeting.counselorJoined
+    });
+  }
+);
+
+// Track when a participant leaves a session
+export const participantLeft = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { meetingId } = req.params;
+    const userId = req.user?._id;
+    const userRole = req.user?.role;
+    const { gracePeriod = true } = req.body;
+
+    if (!userId) {
+      return next(new ErrorHandler('User not authenticated', 401));
+    }
+
+    const meeting = await Meeting.findById(meetingId);
+    if (!meeting) {
+      return next(new ErrorHandler('Meeting not found', 404));
+    }
+
+    // Update last active timestamp based on role
+    if (userRole === 'client') {
+      meeting.clientLastActive = new Date();
+      
+      // Notify counselor if connected
+      const socketEvents = req.app.get('socketEvents');
+      if (socketEvents && meeting.counselorId) {
+        socketEvents.emitParticipantStatus(
+          meeting.counselorId.toString(),
+          {
+            meetingId: meeting._id.toString(),
+            role: 'client',
+            status: 'left',
+            timestamp: new Date()
+          }
+        );
+      }
+    } else if (userRole === 'counselor') {
+      meeting.counselorLastActive = new Date();
+      
+      // Notify client if connected
+      const socketEvents = req.app.get('socketEvents');
+      if (socketEvents) {
+        socketEvents.emitParticipantStatus(
+          meeting.clientId.toString(),
+          {
+            meetingId: meeting._id.toString(),
+            role: 'counselor',
+            status: 'left',
+            timestamp: new Date()
+          }
+        );
+      }
+    }
+
+    meeting.lastParticipantLeft = new Date();
+
+    // Start grace period if both participants had joined
+    if (gracePeriod && meeting.clientJoined && meeting.counselorJoined) {
+      // Set a 5-minute grace period
+      const GRACE_PERIOD_MINUTES = 5;
+      const graceEndTime = new Date();
+      graceEndTime.setMinutes(graceEndTime.getMinutes() + GRACE_PERIOD_MINUTES);
+      
+      meeting.graceActive = true;
+      meeting.graceEndTime = graceEndTime;
+      
+      // Schedule a job to check if session should be marked complete after grace period
+      
+      // Notify about grace period
+      const socketEvents = req.app.get('socketEvents');
+      if (socketEvents) {
+        if (userRole === 'client' && meeting.counselorId) {
+          socketEvents.emitGracePeriod(
+            meeting.counselorId.toString(),
+            {
+              meetingId: meeting._id.toString(),
+              graceEndTime: graceEndTime,
+              participant: 'client'
+            }
+          );
+        } else if (userRole === 'counselor') {
+          socketEvents.emitGracePeriod(
+            meeting.clientId.toString(),
+            {
+              meetingId: meeting._id.toString(),
+              graceEndTime: graceEndTime,
+              participant: 'counselor'
+            }
+          );
+        }
+      }
+    } else if (!gracePeriod) {
+      // If grace period is explicitly disabled, skip it
+      meeting.graceActive = false;
+    }
+
+    await meeting.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Participant left status updated',
+      graceActive: meeting.graceActive,
+      graceEndTime: meeting.graceEndTime
+    });
+  }
+);
+
+// Check meeting status including participant join history
+export const getMeetingStatus = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { meetingId } = req.params;
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return next(new ErrorHandler('User not authenticated', 401));
+    }
+
+    const meeting = await Meeting.findById(meetingId);
+    if (!meeting) {
+      return next(new ErrorHandler('Meeting not found', 404));
+    }
+
+    // Check if the current user has permission to view this meeting
+    const userRole = req.user?.role;
+    let hasPermission = false;
+    
+    if (userRole === 'client' && meeting.clientId.toString() === userId.toString()) {
+      hasPermission = true;
+    } else if (userRole === 'counselor' && meeting.counselorId?.toString() === userId.toString()) {
+      hasPermission = true;
+    } else if (userRole === 'admin') {
+      hasPermission = true;
+    }
+
+    if (!hasPermission) {
+      return next(new ErrorHandler('You do not have permission to view this meeting', 403));
+    }
+
+    // Calculate if we're in a grace period
+    let gracePeriodRemaining = 0;
+    if (meeting.graceActive && meeting.graceEndTime) {
+      const now = new Date();
+      if (now < meeting.graceEndTime) {
+        gracePeriodRemaining = Math.ceil((meeting.graceEndTime.getTime() - now.getTime()) / 1000);
+      } else {
+        // Grace period has expired
+        meeting.graceActive = false;
+        await meeting.save();
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      meeting: {
+        _id: meeting._id,
+        status: meeting.status,
+        clientJoined: meeting.clientJoined,
+        counselorJoined: meeting.counselorJoined,
+        graceActive: meeting.graceActive,
+        gracePeriodRemaining,
+        meetingDate: meeting.meetingDate,
+        meetingTime: meeting.meetingTime,
+        meetingType: meeting.meetingType,
+        meetingDuration: meeting.meetingDuration,
+        clientLastActive: meeting.clientLastActive,
+        counselorLastActive: meeting.counselorLastActive
+      }
+    });
+  }
+);
+
+// Extended complete meeting function to handle participant history
+export const completeMeetingExtended = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { meetingId } = req.params;
+    const userId = req.user?._id;
+    const userRole = req.user?.role;
+    const { forceComplete = false, sessionDetails } = req.body;
+
+    if (!userId) {
+      return next(new ErrorHandler('User not authenticated', 401));
+    }
+
+    const meeting = await Meeting.findById(meetingId);
+    if (!meeting) {
+      return next(new ErrorHandler('Meeting not found', 404));
+    }
+
+    // Check if the current user has permission to complete this meeting
+    let hasPermission = false;
+    
+    if (userRole === 'client' && meeting.clientId.toString() === userId.toString()) {
+      hasPermission = true;
+    } else if (userRole === 'counselor' && meeting.counselorId?.toString() === userId.toString()) {
+      hasPermission = true;
+    } else if (userRole === 'admin') {
+      hasPermission = true;
+    }
+
+    if (!hasPermission) {
+      return next(new ErrorHandler('You do not have permission to complete this meeting', 403));
+    }
+
+    // Determine the appropriate completion status
+    let completionStatus: string;
+    
+    if (forceComplete) {
+      // Administrator override or other special case
+      completionStatus = 'completed';
+    } else if (meeting.clientJoined && meeting.counselorJoined) {
+      // Both participants joined - normal completion
+      completionStatus = 'completed';
+    } else if (meeting.clientJoined && !meeting.counselorJoined) {
+      // Only client joined
+      completionStatus = 'client_only';
+    } else if (!meeting.clientJoined && meeting.counselorJoined) {
+      // Only counselor joined
+      completionStatus = 'counselor_only';
+    } else {
+      // Neither joined but trying to complete - unusual case
+      completionStatus = 'incomplete';
+    }
+
+    // Calculate session duration and details
+    const sessionData = {
+      duration: sessionDetails?.duration || meeting.meetingDuration || 45, // Duration in minutes
+      startTime: meeting.meetingDate!,
+      endTime: new Date(),
+      meetingType: meeting.meetingType,
+      issueDescription: meeting.issueDescription,
+      status: completionStatus,
+      clientJoined: meeting.clientJoined,
+      counselorJoined: meeting.counselorJoined
+    };
+
+    // Update client's session history if applicable
+    if (completionStatus !== 'incomplete') {
+      const client = await Client.findById(meeting.clientId);
+      if (client) {
+        // Add to session history
+        client.sessionHistory.push({
+          counselorId: meeting.counselorId!,
+          sessionDate: meeting.meetingDate!,
+          sessionType: meeting.meetingType,
+          status: completionStatus === 'completed' ? 'completed' : 'incomplete',
+          issueDescription: meeting.issueDescription
+        });
+
+        // Update current counselor if not set and this was a completed session
+        if (!client.currentCounselor && completionStatus === 'completed') {
+          client.currentCounselor = meeting.counselorId;
+        }
+
+        await client.save();
+        await redis.del(client._id.toString());
+      }
+    }
+
+    // Update counselor stats if the counselor joined
+    if (meeting.counselorJoined) {
+      const counselor = await Counselor.findById(meeting.counselorId);
+      if (counselor) {
+        counselor.totalSessions += 1;
+        
+        if (completionStatus === 'completed') {
+          counselor.completedSessions += 1;
+        }
+        
+        // Update active clients count if this is a new client
+        const existingSessions = counselor.totalSessions || 0;
+        if (existingSessions === 1) {
+          counselor.activeClients = (counselor.activeClients || 0) + 1;
+        }
+
+        await counselor.save();
+        await redis.del(counselor._id.toString());
+      }
+    }
+
+    // Clean up virtual meeting room if applicable
+    if (meeting.meetingType === 'virtual' && meeting.dailyRoomName) {
+      try {
+        await dailyService.deleteRoom(meeting.dailyRoomName);
+      } catch (error) {
+        console.error('Failed to delete Daily.co room:', error);
+      }
+    }
+
+    // Update meeting status
+    meeting.status = completionStatus;
+    await meeting.save();
+
+    // Create detailed session record
+    await createSessionRecord(meeting, sessionData);
+
+    // Notify other participants
+    const socketEvents = req.app.get('socketEvents');
+    if (socketEvents) {
+      if (userRole === 'client' && meeting.counselorId) {
+        socketEvents.emitSessionCompleted(
+          meeting.counselorId.toString(),
+          {
+            meetingId: meeting._id.toString(),
+            status: completionStatus
+          }
+        );
+      } else if (userRole === 'counselor') {
+        socketEvents.emitSessionCompleted(
+          meeting.clientId.toString(),
+          {
+            meetingId: meeting._id.toString(),
+            status: completionStatus
+          }
+        );
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Meeting completed successfully',
+      status: completionStatus
+    });
+  }
+);

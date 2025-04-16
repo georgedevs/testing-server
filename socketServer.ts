@@ -1,4 +1,4 @@
-// src/socketServer.ts
+// socketServer.ts
 import { Server as SocketIOServer } from 'socket.io';
 import http from 'http';
 
@@ -125,6 +125,19 @@ export const initSocketEvents = (io: SocketIOServer) => {
             notifyUser(userId, 'meeting_cancelled', data);
             notifyCounselor(counselorId, 'meeting_cancelled', data);
             notifyAdmin('admin_update', { type: 'cancellation', userId, counselorId });
+        },
+
+        // New events for participant tracking
+        emitParticipantStatus: (userId: string, data: any = {}) => {
+            notifyUser(userId, 'participant_status', data);
+        },
+
+        emitGracePeriod: (userId: string, data: any = {}) => {
+            notifyUser(userId, 'grace_period', data);
+        },
+
+        emitSessionCompleted: (userId: string, data: any = {}) => {
+            notifyUser(userId, 'session_completed', data);
         },
 
         emitAdminUpdate: (data: any = {}) => {
