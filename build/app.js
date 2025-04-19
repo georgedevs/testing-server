@@ -15,6 +15,7 @@ const bookingRoute_1 = __importDefault(require("./routes/bookingRoute"));
 const sessionRoute_1 = __importDefault(require("./routes/sessionRoute"));
 const allowedOrigins = [
     'https://testing-george.vercel.app',
+    "https://micounselor.vercel.app"
 ];
 //body parser
 exports.app.use(express_1.default.json({ limit: "50mb" }));

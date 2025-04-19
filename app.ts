@@ -10,6 +10,7 @@ import sessionRouter from "./routes/sessionRoute";
 
 const allowedOrigins = [
     'https://testing-george.vercel.app',
+    "https://micounselor.vercel.app"
       ];
 
 //body parser
