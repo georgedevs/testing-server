@@ -3,13 +3,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateTourStatus = exports.deleteAccount = exports.updateCounselorProfile = exports.updateClientProfile = exports.updateAvatar = exports.resetPassword = exports.forgotPassword = exports.updatePassword = exports.googleAuth = exports.getUserInfo = exports.updateAccessToken = exports.logoutUser = exports.loginUser = exports.activateUser = exports.userRegistration = void 0;
+exports.updateTourStatus = exports.deleteAccount = exports.updateCounselorProfile = exports.updateClientProfile = exports.updateAvatar = exports.resetPassword = exports.forgotPassword = exports.updatePassword = exports.getUserInfo = exports.logoutUser = exports.loginUser = exports.activateUser = exports.userRegistration = void 0;
 const userModel_1 = require("../models/userModel");
 const errorHandler_1 = __importDefault(require("../utils/errorHandler"));
 const catchAsyncErrors_1 = require("../middleware/catchAsyncErrors");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const sendMail_1 = __importDefault(require("../utils/sendMail"));
-const jwt_1 = require("../utils/jwt");
 const redis_1 = require("../utils/redis");
 const sessionManager_1 = require("../utils/sessionManager");
 const avatar_1 = require("../utils/avatar");
@@ -240,9 +239,6 @@ exports.loginUser = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, nex
         if (!isPasswordMatch) {
             return next(new errorHandler_1.default("Invalid email or password", 401));
         }
-        // Generate tokens
-        const accessToken = (0, jwt_1.generateAccessToken)(user);
-        const refreshToken = (0, jwt_1.generateRefreshToken)(user);
         // Create session
         await sessionManager_1.SessionManager.createSession(user._id.toString(), req.deviceId);
         // Update last active timestamp
@@ -268,16 +264,22 @@ exports.loginUser = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, nex
             read: false,
             createdAt: new Date(),
         });
-        // Store session in Redis
-        await redis_1.redis.set(`user_${user._id.toString()}`, JSON.stringify({
-            user_id: user._id.toString(),
-            role: user.role,
-            email: user.email,
-            lastActive: new Date(),
-        }), 'EX', 7 * 24 * 60 * 60 // 7 days
-        );
         await user.save();
-        // Send response with tokens
+        // Store user data in session
+        if (!req.session) {
+            return next(new errorHandler_1.default("Session not available", 500));
+        }
+        req.session.userId = user._id.toString();
+        req.session.user = {
+            _id: user._id,
+            email: user.email,
+            role: user.role,
+            isVerified: user.isVerified,
+            isActive: user.isActive,
+            avatar: user.avatar,
+            lastActive: user.lastActive,
+        };
+        // Send response
         res.status(200).json({
             success: true,
             user: {
@@ -288,9 +290,7 @@ exports.loginUser = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, nex
                 isActive: user.isActive,
                 avatar: user.avatar,
                 lastActive: user.lastActive,
-            },
-            accessToken,
-            refreshToken,
+            }
         });
     }
     catch (error) {
@@ -319,9 +319,17 @@ exports.logoutUser = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, ne
             await userModel_1.User.findByIdAndUpdate(user._id, {
                 lastActive: new Date()
             });
-            // Clear Redis session
-            await redis_1.redis.del(`user_${user._id.toString()}`);
         }
+        // Destroy session
+        if (req.session) {
+            req.session.destroy((err) => {
+                if (err) {
+                    return next(new errorHandler_1.default("Failed to logout", 500));
+                }
+            });
+        }
+        // Clear session cookie
+        res.clearCookie('sid');
         res.status(200).json({
             success: true,
             message: "Logged out successfully"
@@ -331,119 +339,23 @@ exports.logoutUser = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, ne
         return next(new errorHandler_1.default(error.message, 500));
     }
 });
-// Update access token controller
-exports.updateAccessToken = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
-    try {
-        const { refreshToken } = req.body;
-        if (!refreshToken) {
-            return next(new errorHandler_1.default("No refresh token provided", 401));
-        }
-        const decoded = jsonwebtoken_1.default.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
-        if (!decoded) {
-            return next(new errorHandler_1.default("Invalid refresh token", 401));
-        }
-        // Get user from Redis using string key
-        const redisKey = getRedisKey(decoded.id);
-        const userSession = await redis_1.redis.get(redisKey);
-        if (!userSession) {
-            return next(new errorHandler_1.default("Session expired. Please login again", 401));
-        }
-        const userData = JSON.parse(userSession);
-        // Create new tokens
-        const accessToken = (0, jwt_1.generateAccessToken)(userData);
-        const newRefreshToken = (0, jwt_1.generateRefreshToken)(userData);
-        // Update Redis session with new expiry
-        await redis_1.redis.set(redisKey, JSON.stringify({ ...userData, lastActive: new Date() }), 'EX', 7 * 24 * 60 * 60 // 7 days in seconds
-        );
-        res.status(200).json({
-            success: true,
-            accessToken,
-            refreshToken: newRefreshToken,
-            user: userData
-        });
-    }
-    catch (error) {
-        if (error instanceof jsonwebtoken_1.default.TokenExpiredError) {
-            return next(new errorHandler_1.default("Refresh token expired", 401));
-        }
-        if (error instanceof jsonwebtoken_1.default.JsonWebTokenError) {
-            return next(new errorHandler_1.default("Invalid refresh token", 401));
-        }
-        return next(new errorHandler_1.default(error.message, 500));
-    }
-});
+;
 // Get user info controller
 exports.getUserInfo = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
     try {
-        const userId = req.user?._id;
-        if (!userId) {
+        if (!req.user?._id) {
             return next(new errorHandler_1.default("User not authenticated", 401));
         }
-        // Convert ObjectId to string for Redis key
-        const redisKey = getRedisKey(userId);
-        // Try to get user from Redis first
-        const cachedUser = await redis_1.redis.get(redisKey);
-        if (cachedUser) {
-            const userData = JSON.parse(cachedUser);
-            return res.status(200).json({
-                success: true,
-                user: userData
-            });
-        }
-        // If not in Redis, get from DB and cache it
+        const userId = req.user._id;
+        // Get user from DB
         const user = await userModel_1.User.findById(userId).select("-password");
         if (!user) {
             return next(new errorHandler_1.default("User not found", 404));
         }
-        // Cache user data in Redis using string key
-        await redis_1.redis.set(redisKey, JSON.stringify(user), 'EX', 3600); // Cache for 1 hour
         res.status(200).json({
             success: true,
             user
         });
-    }
-    catch (error) {
-        return next(new errorHandler_1.default(error.message, 500));
-    }
-});
-exports.googleAuth = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
-    try {
-        const { email } = req.body;
-        if (!email) {
-            return next(new errorHandler_1.default("Email is required", 400));
-        }
-        // Check if user exists
-        let user = await userModel_1.Client.findOne({ email });
-        if (!user) {
-            // Create new client following the same pattern as regular signup
-            user = await userModel_1.Client.create({
-                email,
-                password: `google_${Math.random().toString(36).slice(-8)}`, // Random password for Google users
-                role: "client",
-                isVerified: true // Google users are pre-verified
-            });
-            // Send welcome email
-            try {
-                await (0, sendMail_1.default)({
-                    email,
-                    subject: "Welcome to MiCounselor",
-                    template: "welcome-mail.ejs",
-                    data: {
-                        user: {
-                            email,
-                            fullName: email.split("@")[0],
-                            role: "client"
-                        }
-                    }
-                });
-            }
-            catch (error) {
-                console.error("Welcome email failed:", error);
-                // Don't return error as user is already created
-            }
-        }
-        // Send authentication token
-        (0, jwt_1.sendToken)(user, user ? 200 : 201, res);
     }
     catch (error) {
         return next(new errorHandler_1.default(error.message, 500));
@@ -812,11 +724,20 @@ exports.deleteAccount = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res,
                 break;
             }
         }
-        // Clear user sessions
+        // Clean up sessions and cached user data
         const redisKey = userId.toString();
         await redis_1.redis.del(redisKey);
-        await (0, jwt_1.clearTokens)(userId);
         await sessionManager_1.SessionManager.removeSession(userId.toString());
+        // Destroy the current session
+        if (req.session) {
+            req.session.destroy((err) => {
+                if (err) {
+                    console.error("Error destroying session during account deletion:", err);
+                }
+            });
+        }
+        // Clear session cookie
+        res.clearCookie('sid');
         // Delete the user account
         await userModel_1.User.findByIdAndDelete(userId);
         res.status(200).json({

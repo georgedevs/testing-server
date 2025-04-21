@@ -40,7 +40,6 @@ exports.Admin = exports.Counselor = exports.Client = exports.User = void 0;
 require('dotenv').config();
 const mongoose_1 = __importStar(require("mongoose"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
-const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const emailRegexPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Base user schema
 const userSchema = new mongoose_1.Schema({
@@ -280,14 +279,6 @@ userSchema.pre("save", function (next) {
 // Compare password method
 userSchema.methods.comparePassword = async function (enteredPassword) {
     return await bcryptjs_1.default.compare(enteredPassword, this.password);
-};
-// Sign access token method
-userSchema.methods.signAccessToken = function () {
-    return jsonwebtoken_1.default.sign({ id: this._id }, process.env.ACCESS_TOKEN || "");
-};
-//sign refresh token 
-userSchema.methods.signRefreshToken = function () {
-    return jsonwebtoken_1.default.sign({ id: this._id }, process.env.REFRESH_TOKEN || "");
 };
 // Create the models
 const User = mongoose_1.default.model('User', userSchema);

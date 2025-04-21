@@ -6,7 +6,6 @@ import jwt, { JwtPayload, Secret } from "jsonwebtoken";
 import ejs from "ejs";
 import path from "path";
 import sendMail from "../utils/sendMail";
-import {clearTokens, generateAccessToken, generateRefreshToken, sendToken } from "../utils/jwt";
 import { redis } from "../utils/redis";
 import { Types } from "mongoose";
 import { avatarOptions } from "../config/avatarOptions";
@@ -312,10 +311,6 @@ export const loginUser = CatchAsyncError(
         return next(new ErrorHandler("Invalid email or password", 401));
       }
 
-      // Generate tokens
-      const accessToken = generateAccessToken(user);
-      const refreshToken = generateRefreshToken(user);
-
       // Create session
       await SessionManager.createSession(user._id.toString(), req.deviceId);
       
@@ -345,22 +340,25 @@ export const loginUser = CatchAsyncError(
         createdAt: new Date(),
       });
 
-      // Store session in Redis
-      await redis.set(
-        `user_${user._id.toString()}`,
-        JSON.stringify({
-          user_id: user._id.toString(),
-          role: user.role,
-          email: user.email,
-          lastActive: new Date(),
-        }),
-        'EX',
-        7 * 24 * 60 * 60 // 7 days
-      );
-
       await user.save();
 
-      // Send response with tokens
+      // Store user data in session
+      if (!req.session) {
+        return next(new ErrorHandler("Session not available", 500));
+      }
+
+      req.session.userId = user._id.toString();
+      req.session.user = {
+        _id: user._id,
+        email: user.email,
+        role: user.role,
+        isVerified: user.isVerified,
+        isActive: user.isActive,
+        avatar: user.avatar,
+        lastActive: user.lastActive,
+      };
+
+      // Send response
       res.status(200).json({
         success: true,
         user: {
@@ -371,15 +369,14 @@ export const loginUser = CatchAsyncError(
           isActive: user.isActive,
           avatar: user.avatar,
           lastActive: user.lastActive,
-        },
-        accessToken,
-        refreshToken,
+        }
       });
     } catch (error: any) {
       return next(new ErrorHandler(error.message, 500));
     }
   }
 );
+
 
 
 export const logoutUser = CatchAsyncError(
@@ -408,10 +405,19 @@ export const logoutUser = CatchAsyncError(
         await User.findByIdAndUpdate(user._id, {
           lastActive: new Date()
         });
-
-        // Clear Redis session
-        await redis.del(`user_${user._id.toString()}`);
       }
+
+      // Destroy session
+      if (req.session) {
+        req.session.destroy((err) => {
+          if (err) {
+            return next(new ErrorHandler("Failed to logout", 500));
+          }
+        });
+      }
+
+      // Clear session cookie
+      res.clearCookie('sid');
 
       res.status(200).json({
         success: true,
@@ -421,160 +427,29 @@ export const logoutUser = CatchAsyncError(
       return next(new ErrorHandler(error.message, 500));
     }
   }
-);
+);;
 
- // Update access token controller
- export const updateAccessToken = CatchAsyncError(
-  async (req: Request, res: Response, next: NextFunction) => {
-      try {
-          const { refreshToken } = req.body;
-          
-          if (!refreshToken) {
-              return next(new ErrorHandler("No refresh token provided", 401));
-          }
-
-          const decoded = jwt.verify(
-              refreshToken,
-              process.env.REFRESH_TOKEN_SECRET as string
-          ) as JwtPayload;
-
-          if (!decoded) {
-              return next(new ErrorHandler("Invalid refresh token", 401));
-          }
-
-          // Get user from Redis using string key
-          const redisKey = getRedisKey(decoded.id);
-          const userSession = await redis.get(redisKey);
-          
-          if (!userSession) {
-              return next(new ErrorHandler("Session expired. Please login again", 401));
-          }
-
-          const userData = JSON.parse(userSession);
-
-          // Create new tokens
-          const accessToken = generateAccessToken(userData);
-          const newRefreshToken = generateRefreshToken(userData);
-
-          // Update Redis session with new expiry
-          await redis.set(
-              redisKey,
-              JSON.stringify({ ...userData, lastActive: new Date() }),
-              'EX',
-              7 * 24 * 60 * 60 // 7 days in seconds
-          );
-
-          res.status(200).json({
-              success: true,
-              accessToken,
-              refreshToken: newRefreshToken,
-              user: userData
-          });
-      } catch (error: any) {
-          if (error instanceof jwt.TokenExpiredError) {
-              return next(new ErrorHandler("Refresh token expired", 401));
-          }
-          if (error instanceof jwt.JsonWebTokenError) {
-              return next(new ErrorHandler("Invalid refresh token", 401));
-          }
-          return next(new ErrorHandler(error.message, 500));
-      }
-  }
-);
   // Get user info controller
   export const getUserInfo = CatchAsyncError(
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const userId = req.user?._id;
-        
-        if (!userId) {
+        if (!req.user?._id) {
           return next(new ErrorHandler("User not authenticated", 401));
         }
   
-        // Convert ObjectId to string for Redis key
-        const redisKey = getRedisKey(userId);
-  
-        // Try to get user from Redis first
-        const cachedUser = await redis.get(redisKey);
+        const userId = req.user._id;
         
-        if (cachedUser) {
-          const userData = JSON.parse(cachedUser);
-          return res.status(200).json({
-            success: true,
-            user: userData
-          });
-        }
-  
-        // If not in Redis, get from DB and cache it
+        // Get user from DB
         const user = await User.findById(userId).select("-password");
         
         if (!user) {
           return next(new ErrorHandler("User not found", 404));
         }
   
-        // Cache user data in Redis using string key
-        await redis.set(redisKey, JSON.stringify(user), 'EX', 3600); // Cache for 1 hour
-  
         res.status(200).json({
           success: true,
           user
         });
-      } catch (error: any) {
-        return next(new ErrorHandler(error.message, 500));
-      }
-    }
-  );
-
-
-  interface IGoogleAuthRequest extends Request {
-    body: {
-      email: string;
-    };
-  }
-  
-  export const googleAuth = CatchAsyncError(
-    async (req: IGoogleAuthRequest, res: Response, next: NextFunction) => {
-      try {
-        const { email } = req.body;
-  
-        if (!email) {
-          return next(new ErrorHandler("Email is required", 400));
-        }
-  
-        // Check if user exists
-        let user = await Client.findOne({ email });
-  
-        if (!user) {
-          // Create new client following the same pattern as regular signup
-          user = await Client.create({
-            email,
-            password: `google_${Math.random().toString(36).slice(-8)}`, // Random password for Google users
-            role: "client",
-            isVerified: true // Google users are pre-verified
-          });
-  
-          // Send welcome email
-          try {
-            await sendMail({
-              email,
-              subject: "Welcome to MiCounselor",
-              template: "welcome-mail.ejs",
-              data: {
-                user: {
-                  email,
-                  fullName: email.split("@")[0],
-                  role: "client"
-                }
-              }
-            });
-          } catch (error) {
-            console.error("Welcome email failed:", error);
-            // Don't return error as user is already created
-          }
-        }
-  
-        // Send authentication token
-        sendToken(user, user ? 200 : 201, res);
       } catch (error: any) {
         return next(new ErrorHandler(error.message, 500));
       }
@@ -1070,12 +945,22 @@ export const updateAvatar = CatchAsyncError(
           }
         }
   
-        // Clear user sessions
+        // Clean up sessions and cached user data
         const redisKey = userId.toString();
         await redis.del(redisKey);
-        await clearTokens(userId);
-
-           await SessionManager.removeSession(userId.toString());
+        await SessionManager.removeSession(userId.toString());
+        
+        // Destroy the current session
+        if (req.session) {
+          req.session.destroy((err) => {
+            if (err) {
+              console.error("Error destroying session during account deletion:", err);
+            }
+          });
+        }
+        
+        // Clear session cookie
+        res.clearCookie('sid');
   
         // Delete the user account
         await User.findByIdAndDelete(userId);

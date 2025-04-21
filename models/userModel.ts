@@ -34,8 +34,6 @@ export interface IUser extends Document {
   lastActive: Date;
   tourViewed: boolean;
   comparePassword(password: string): Promise<boolean>;
-  signAccessToken:() => string;
-  signRefreshToken:() => string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -358,15 +356,6 @@ userSchema.methods.comparePassword = async function(enteredPassword: string): Pr
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Sign access token method
-userSchema.methods.signAccessToken = function(): string {
-  return jwt.sign({ id: this._id }, process.env.ACCESS_TOKEN || "")
-};
-
-//sign refresh token 
-userSchema.methods.signRefreshToken = function(): string {
-    return jwt.sign({ id: this._id }, process.env.REFRESH_TOKEN || "")
-  };
 
 // Create the models
 const User = mongoose.model<IUser>('User', userSchema);

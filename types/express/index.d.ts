@@ -1,3 +1,4 @@
+// types/express/index.d.ts (UPDATED)
 import { Types } from 'mongoose';
 import { IUser } from '../../models/userModel';
 
@@ -7,9 +8,21 @@ declare global {
       deviceId?: string;
       user?: IUser;
       cookies: {
-        access_token?: string;
-        refresh_token?: string;
         device_id?: string;
+      };
+    }
+
+    interface Session {
+      userId?: string;
+      user?: {
+        _id: Types.ObjectId;
+        email: string;
+        role: string;
+        isVerified: boolean;
+        isActive: boolean;
+        avatar?: any;
+        lastActive: Date;
+        [key: string]: any;
       };
     }
   }

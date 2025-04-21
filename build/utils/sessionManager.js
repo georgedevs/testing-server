@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SessionManager = void 0;
+// utils/sessionManager.ts (UPDATED)
 const redis_1 = require("./redis");
-// utils/sessionManager.ts
 class SessionManager {
     static async createSession(userId, deviceId) {
         if (!userId || !deviceId) {

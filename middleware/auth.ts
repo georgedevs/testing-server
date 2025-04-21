@@ -1,91 +1,58 @@
-require('dotenv').config()
+// middleware/auth.ts (UPDATED)
 import { Request, Response, NextFunction } from "express";
 import { CatchAsyncError } from "./catchAsyncErrors";
 import ErrorHandler from "../utils/errorHandler";
-import jwt, { JwtPayload } from "jsonwebtoken";
-import { redis } from "../utils/redis";
 import { IUser } from "../models/userModel";
-import { updateAccessToken } from "../controllers/userController";
 import { Types } from "mongoose";
 
-
-const getRedisKey = (userId: Types.ObjectId | string): string => {
-    return `user_${userId.toString()}`;
-};
-
 declare global {
-    namespace Express {
-        interface Request {
-            user?: IUser;
-        }
+  namespace Express {
+    interface Request {
+      user?: IUser;
     }
+  }
 }
+
 export const isAuthenticated = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
-      try {
-          // Get token from Authorization header
-          const authHeader = req.headers.authorization;
-          const accessToken = authHeader?.startsWith('Bearer ') 
-              ? authHeader.substring(7) 
-              : null;
-
-          if (!accessToken) {
-              return next(new ErrorHandler("Please login to access this resource", 401));
-          }
-
-          // Verify access token
-          const decoded = jwt.verify(
-              accessToken,
-              process.env.ACCESS_TOKEN_SECRET as string
-          ) as JwtPayload;
-
-          if (!decoded || !decoded.id) {
-              return next(new ErrorHandler("Invalid access token", 401));
-          }
-
-          // Get user from Redis using consistent key format
-          const redisKey = getRedisKey(decoded.id);
-          const userSession = await redis.get(redisKey);
-
-          if (!userSession) {
-              return next(new ErrorHandler("Please login to access this resource", 401));
-          }
-
-          const userData = JSON.parse(userSession);
-
-          // Ensure the user data has required fields
-          if (!userData.user_id || !userData.role || !userData.email) {
-              return next(new ErrorHandler("Invalid session data", 401));
-          }
-
-          // Set user data in request
-          req.user = {
-              _id: new Types.ObjectId(userData.user_id),
-              role: userData.role,
-              email: userData.email,
-              lastActive: new Date(),
-              isVerified: true,
-              isActive: true
-          } as IUser;
-
-          // Update last active in Redis
-          userData.lastActive = new Date();
-          await redis.set(redisKey, JSON.stringify(userData));
-
-          next();
-      } catch (error: any) {
-          if (error instanceof jwt.TokenExpiredError) {
-              return next(new ErrorHandler("Access token expired", 401));
-          }
-          if (error instanceof jwt.JsonWebTokenError) {
-              return next(new ErrorHandler("Invalid access token", 401));
-          }
-          return next(new ErrorHandler(`Authentication failed: ${error.message}`, 401));
+    try {
+      // Check if user is authenticated via session
+      if (!req.session || !req.session.userId) {
+        return next(new ErrorHandler("Please login to access this resource", 401));
       }
+
+      // Get user from session
+      const userId = req.session.userId;
+      
+      // Set user in request
+      if (req.session.user) {
+        // Create user object from session data, avoiding property overwriting
+        const sessionUser = req.session.user;
+        
+        req.user = {
+          // Set the important properties with proper types
+          _id: new Types.ObjectId(userId),
+          // Include other required properties without duplication
+          email: sessionUser.email,
+          role: sessionUser.role,
+          isVerified: true,
+          isActive: true,
+          lastActive: new Date(),
+          // Spread remaining properties that aren't explicitly set above
+          ...(Object.keys(sessionUser)
+            .filter(key => !['_id', 'email', 'role'].includes(key))
+            .reduce((obj, key) => ({ ...obj, [key]: sessionUser[key] }), {}))
+        } as IUser;
+      } else {
+        return next(new ErrorHandler("User data not found in session", 401));
+      }
+
+      next();
+    } catch (error: any) {
+      return next(new ErrorHandler(`Authentication failed: ${error.message}`, 401));
+    }
   }
 );
-
-
 // Role authorization middleware
 export const authorizeRoles = (...roles: Array<"client" | "admin" | "counselor">) => {
   return (req: Request, res: Response, next: NextFunction) => {

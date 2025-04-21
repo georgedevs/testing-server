@@ -1,3 +1,4 @@
+// utils/sessionManager.ts (UPDATED)
 import { redis } from './redis';
 
 interface SessionInfo {
@@ -5,7 +6,6 @@ interface SessionInfo {
     lastActive: number;
 }
 
-// utils/sessionManager.ts
 export class SessionManager {
     private static readonly SESSION_PREFIX = 'session:';
     private static readonly DEVICE_PREFIX = 'device:';

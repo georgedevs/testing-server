@@ -1,14 +1,35 @@
 // socketServer.ts
 import { Server as SocketIOServer } from 'socket.io';
 import http from 'http';
+import session from 'express-session';
+import { sessionConfig } from './utils/sessionStore';
+import { Server } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
+import { redis } from './utils/redis';
 
 export const initSocketServer = (server: http.Server) => {
     const io = new SocketIOServer(server, {
         cors: {
-            origin: ["https://testing-george.vercel.app"],
+            origin: ["https://micounselor.vercel.app", "http://localhost:3000"],
             methods: ["GET", "POST"],
             credentials: true
-        }
+        },
+        adapter: createAdapter(redis, redis.duplicate())
+    });
+
+      // Middleware to handle authentication from session
+      io.use((socket, next) => {
+        const sessionMiddleware = session(sessionConfig);
+        sessionMiddleware(socket.request as any, {} as any, () => {
+            const sessionData = (socket.request as any).session;
+            if (sessionData && sessionData.userId) {
+                socket.data.userId = sessionData.userId;
+                socket.data.userRole = sessionData.user?.role;
+                next();
+            } else {
+                next(new Error("Authentication required"));
+            }
+        });
     });
 
     io.on("connection", (socket) => {

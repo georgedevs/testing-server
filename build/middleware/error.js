@@ -28,6 +28,11 @@ const ErrorMiddleware = (err, req, res, next) => {
         const message = `Json Web Token is Expired, try again`;
         err = new errorHandler_1.default(message, 400);
     }
+    // session error handling
+    if (err.name === 'SessionError') {
+        const message = `Session error: ${err.message}`;
+        err = new errorHandler_1.default(message, 401);
+    }
     res.status(err.statusCode).json({
         success: false,
         message: err.message

@@ -1,15 +1,38 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initSocketEvents = exports.initSocketServer = void 0;
 // socketServer.ts
 const socket_io_1 = require("socket.io");
+const express_session_1 = __importDefault(require("express-session"));
+const sessionStore_1 = require("./utils/sessionStore");
+const redis_adapter_1 = require("@socket.io/redis-adapter");
+const redis_1 = require("./utils/redis");
 const initSocketServer = (server) => {
     const io = new socket_io_1.Server(server, {
         cors: {
-            origin: ["https://testing-george.vercel.app"],
+            origin: ["https://micounselor.vercel.app", "http://localhost:3000"],
             methods: ["GET", "POST"],
             credentials: true
-        }
+        },
+        adapter: (0, redis_adapter_1.createAdapter)(redis_1.redis, redis_1.redis.duplicate())
+    });
+    // Middleware to handle authentication from session
+    io.use((socket, next) => {
+        const sessionMiddleware = (0, express_session_1.default)(sessionStore_1.sessionConfig);
+        sessionMiddleware(socket.request, {}, () => {
+            const sessionData = socket.request.session;
+            if (sessionData && sessionData.userId) {
+                socket.data.userId = sessionData.userId;
+                socket.data.userRole = sessionData.user?.role;
+                next();
+            }
+            else {
+                next(new Error("Authentication required"));
+            }
+        });
     });
     io.on("connection", (socket) => {
         console.log('Client connected:', socket.id);

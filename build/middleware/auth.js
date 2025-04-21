@@ -4,62 +4,42 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.isOwnerOrAdmin = exports.isCounselor = exports.isAdmin = exports.authorizeRoles = exports.isAuthenticated = void 0;
-require('dotenv').config();
 const catchAsyncErrors_1 = require("./catchAsyncErrors");
 const errorHandler_1 = __importDefault(require("../utils/errorHandler"));
-const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const redis_1 = require("../utils/redis");
 const mongoose_1 = require("mongoose");
-const getRedisKey = (userId) => {
-    return `user_${userId.toString()}`;
-};
 exports.isAuthenticated = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
     try {
-        // Get token from Authorization header
-        const authHeader = req.headers.authorization;
-        const accessToken = authHeader?.startsWith('Bearer ')
-            ? authHeader.substring(7)
-            : null;
-        if (!accessToken) {
+        // Check if user is authenticated via session
+        if (!req.session || !req.session.userId) {
             return next(new errorHandler_1.default("Please login to access this resource", 401));
         }
-        // Verify access token
-        const decoded = jsonwebtoken_1.default.verify(accessToken, process.env.ACCESS_TOKEN_SECRET);
-        if (!decoded || !decoded.id) {
-            return next(new errorHandler_1.default("Invalid access token", 401));
+        // Get user from session
+        const userId = req.session.userId;
+        // Set user in request
+        if (req.session.user) {
+            // Create user object from session data, avoiding property overwriting
+            const sessionUser = req.session.user;
+            req.user = {
+                // Set the important properties with proper types
+                _id: new mongoose_1.Types.ObjectId(userId),
+                // Include other required properties without duplication
+                email: sessionUser.email,
+                role: sessionUser.role,
+                isVerified: true,
+                isActive: true,
+                lastActive: new Date(),
+                // Spread remaining properties that aren't explicitly set above
+                ...(Object.keys(sessionUser)
+                    .filter(key => !['_id', 'email', 'role'].includes(key))
+                    .reduce((obj, key) => ({ ...obj, [key]: sessionUser[key] }), {}))
+            };
         }
-        // Get user from Redis using consistent key format
-        const redisKey = getRedisKey(decoded.id);
-        const userSession = await redis_1.redis.get(redisKey);
-        if (!userSession) {
-            return next(new errorHandler_1.default("Please login to access this resource", 401));
+        else {
+            return next(new errorHandler_1.default("User data not found in session", 401));
         }
-        const userData = JSON.parse(userSession);
-        // Ensure the user data has required fields
-        if (!userData.user_id || !userData.role || !userData.email) {
-            return next(new errorHandler_1.default("Invalid session data", 401));
-        }
-        // Set user data in request
-        req.user = {
-            _id: new mongoose_1.Types.ObjectId(userData.user_id),
-            role: userData.role,
-            email: userData.email,
-            lastActive: new Date(),
-            isVerified: true,
-            isActive: true
-        };
-        // Update last active in Redis
-        userData.lastActive = new Date();
-        await redis_1.redis.set(redisKey, JSON.stringify(userData));
         next();
     }
     catch (error) {
-        if (error instanceof jsonwebtoken_1.default.TokenExpiredError) {
-            return next(new errorHandler_1.default("Access token expired", 401));
-        }
-        if (error instanceof jsonwebtoken_1.default.JsonWebTokenError) {
-            return next(new errorHandler_1.default("Invalid access token", 401));
-        }
         return next(new errorHandler_1.default(`Authentication failed: ${error.message}`, 401));
     }
 });

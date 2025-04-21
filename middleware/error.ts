@@ -30,6 +30,12 @@ export const ErrorMiddleware= (err: any, req: Request, res: Response, next: Next
         err = new ErrorHandler(message, 400);
     }
 
+        // session error handling
+      if (err.name === 'SessionError') {
+        const message = `Session error: ${err.message}`;
+        err = new ErrorHandler(message, 401);
+    }
+
     res.status(err.statusCode).json({
         success: false,
         message: err.message
