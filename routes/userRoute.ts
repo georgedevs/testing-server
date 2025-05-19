@@ -6,7 +6,7 @@ import { loginLimiter, registrationLimiter } from '../middleware/rateLimit';
 import { deviceCheck } from '../middleware/deviceCheck';
 const userRouter = express.Router();
 
-userRouter.post('/registration',registrationLimiter, userRegistration)
+userRouter.post('/registration', userRegistration)
 
 userRouter.post('/activation', activateUser)
 

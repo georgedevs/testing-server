@@ -5,6 +5,7 @@ import http from 'http';
 import { app } from './app';
 import connectDB from './utils/db';
 import { initSocketEvents, initSocketServer } from './socketServer';
+import { initSessionCleanup } from './utils/sessionCleanup';
 
 const getCurrentTimeInfo = () => {
   const now = new Date();
@@ -35,4 +36,7 @@ server.listen(PORT, () => {
     console.log(`Server is connected with port ${PORT}`);
     console.log(`Server time info:`, timeInfo);
     connectDB();
+
+    initSessionCleanup();
+    console.log('Starting cleanup job')
 });

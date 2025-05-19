@@ -1,4 +1,3 @@
-// middleware/auth.ts (UPDATED)
 import { Request, Response, NextFunction } from "express";
 import { CatchAsyncError } from "./catchAsyncErrors";
 import ErrorHandler from "../utils/errorHandler";

@@ -10,7 +10,7 @@ import ErrorHandler from '../utils/errorHandler';
 import { CatchAsyncError } from '../middleware/catchAsyncErrors';
 import { dailyService } from '../utils/dailyService';
 import mongoose, { PopulatedDoc } from 'mongoose';
-// 1. Initial Meeting Request   
+
 // 1. Initial Meeting Request   
 export const initiateBooking = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {

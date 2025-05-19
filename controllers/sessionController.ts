@@ -8,6 +8,8 @@ import { Client, Counselor } from '../models/userModel';
 import sendMail from '../utils/sendMail';
 import { startOfDay, addMinutes } from 'date-fns';
 
+
+//IF WE CHOOSE TO USE TWILIO 
 // Create session from confirmed meeting
 export const createSession = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {

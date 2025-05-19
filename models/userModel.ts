@@ -177,7 +177,7 @@ const clientSchema = new Schema<IClient>({
   username: {
     type: String,
     unique: true,
-    sparse: true, // This allows multiple documents to have no username
+    sparse: true, 
     minlength: [3, "Username must be at least 3 characters"],
     maxlength: [30, "Username cannot exceed 30 characters"],
     trim: true,

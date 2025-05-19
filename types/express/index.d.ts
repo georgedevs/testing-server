@@ -1,4 +1,3 @@
-// types/express/index.d.ts (UPDATED)
 import { Types } from 'mongoose';
 import { IUser } from '../../models/userModel';
 

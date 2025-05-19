@@ -12,6 +12,8 @@ const redisStore = new RedisStore({
   prefix: 'sess:'
 });
 
+redisStore.setMaxListeners(20)
+
 export const sessionConfig = {
   name: 'sid',
   secret: process.env.SESSION_SECRET || 'fallback_secret_do_not_use_in_production',

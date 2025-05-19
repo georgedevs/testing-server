@@ -1,4 +1,3 @@
-// utils/sessionManager.ts (UPDATED)
 import { redis } from './redis';
 
 interface SessionInfo {

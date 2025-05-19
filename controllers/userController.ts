@@ -11,6 +11,7 @@ import { Types } from "mongoose";
 import { avatarOptions } from "../config/avatarOptions";
 import { SessionManager } from "../utils/sessionManager";
 import { getAvatarDetails, validateAvatarId } from "../utils/avatar";
+import { Meeting } from "../models/bookingModel";
 
 const getRedisKey = (userId: Types.ObjectId | string): string => {
     return userId.toString();
@@ -536,12 +537,23 @@ interface IPasswordUpdate {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const { email } = req.body as IForgotPassword;
+        
+          // Always respond with the same message whether the user exists or not
+      const standardResponse = {
+        success: true,
+        message: "If an account exists with this email, a password reset OTP has been sent."
+      };
+
   
+        // Only process further if user actually exists
         const user = await User.findOne({ email });
         if (!user) {
-          return next(new ErrorHandler("User not found", 404));
+          // For non-existent users, add a small delay to prevent timing attacks
+          await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
+          
+          // Return the standard response without any token
+          return res.status(200).json(standardResponse);
         }
-  
         // Generate OTP
         const otp = generateOTP();
         
@@ -565,14 +577,19 @@ interface IPasswordUpdate {
                 data: { user: { email: user.email, otp } }
             });
   
-          res.status(200).json({
-            success: true,
-            message: "Password reset OTP sent to your email",
-            resetToken
-          });
+            if (process.env.NODE_ENV === 'development') {
+              return res.status(200).json({
+                ...standardResponse,
+                // Include resetToken for development purposes
+                resetToken
+              });
+            } else {
+              // In production, don't send the actual token
+              return res.status(200).json(standardResponse);
+            }
         } catch (error: any) {
           await redis.del(resetKey);
-          return next(new ErrorHandler("Error sending reset email", 500));
+          return next(new ErrorHandler("Error sending password reset instructions", 500));
         }
       } catch (error: any) {
         return next(new ErrorHandler(error.message, 500));
@@ -584,25 +601,69 @@ interface IPasswordUpdate {
   export const resetPassword = CatchAsyncError(
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const { resetToken, newPassword } = req.body as IResetPassword;
+        const { resetToken, newPassword, email, otp } = req.body;
   
-        // Verify reset token
-        const decoded = jwt.verify(
-          resetToken,
-          process.env.RESET_TOKEN_SECRET as string
-        ) as { email: string; otp: string };
+        // Make sure we have either a resetToken or an email+otp combo
+        if (!resetToken && (!email || !otp)) {
+          return next(new ErrorHandler("Invalid request parameters", 400));
+        }
   
-        const user = await User.findOne({ email: decoded.email });
+        let userEmail: string;
+        let userOtp: string;
+  
+        // Handle both resetToken and direct email+otp flow
+        if (resetToken) {
+          // Verify reset token
+          try {
+            const decoded = jwt.verify(
+              resetToken,
+              process.env.RESET_TOKEN_SECRET as string
+            ) as { email: string; otp: string };
+            
+            userEmail = decoded.email;
+            userOtp = decoded.otp;
+          } catch (error) {
+            // Generic error message for security
+            return next(new ErrorHandler("Invalid or expired reset token", 400));
+          }
+        } else {
+          // Direct email+otp flow
+          userEmail = email;
+          userOtp = otp;
+        }
+  
+        // Find the user
+        const user = await User.findOne({ email: userEmail });
         if (!user) {
-          return next(new ErrorHandler("User not found", 404));
+          // For security, don't reveal that the user doesn't exist
+          // Add a small delay to prevent timing attacks
+          await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
+          return next(new ErrorHandler("Invalid or expired reset token", 400));
         }
   
         // Check if reset token exists in Redis
         const resetKey = `reset:${user._id}`;
         const storedToken = await redis.get(resetKey);
   
-        if (!storedToken || storedToken !== resetToken) {
+        if (!storedToken) {
           return next(new ErrorHandler("Invalid or expired reset token", 400));
+        }
+  
+        // Verify OTP if direct flow
+        if (!resetToken) {
+          try {
+            const decoded = jwt.verify(
+              storedToken,
+              process.env.RESET_TOKEN_SECRET as string
+            ) as { email: string; otp: string };
+            
+            // Check if OTP matches
+            if (decoded.otp !== userOtp) {
+              return next(new ErrorHandler("Invalid verification code", 400));
+            }
+          } catch (error) {
+            return next(new ErrorHandler("Invalid or expired reset token", 400));
+          }
         }
   
         // Update password
@@ -617,12 +678,12 @@ interface IPasswordUpdate {
   
         // Send confirmation email
         try {
-            await sendMail({
-                email: user.email,
-                subject: "Password Reset Successful",
-                template: "reset-success.ejs",
-                data: { user }
-            });
+          await sendMail({
+            email: user.email,
+            subject: "Password Reset Successful",
+            template: "reset-success.ejs",
+            data: { user }
+          });
         } catch (error) {
           console.error("Password reset confirmation email failed:", error);
         }
@@ -893,6 +954,10 @@ export const updateAvatar = CatchAsyncError(
         if (!user) {
           return next(new ErrorHandler("User not found", 404));
         }
+
+        if(!password || password.trim() === ""){
+          return next(new ErrorHandler("Password is required to delete account", 400))
+        }
   
         // Verify password before proceeding with deletion
         if (password) {
@@ -901,6 +966,38 @@ export const updateAvatar = CatchAsyncError(
             return next(new ErrorHandler("Invalid password", 401));
           }
         }
+
+        if (user.role === "counselor") {
+          // Cast user to ICounselor type for counselor-specific properties
+          const counselorUser = await Counselor.findById(userId) as ICounselor;
+          
+          // Check for active clients
+          if (counselorUser.activeClients > 0) {
+            return next(
+              new ErrorHandler(
+                "Cannot delete account with active clients. Please transfer or complete all active client relationships first.",
+                400
+              )
+            );
+          }
+          
+          // Check for upcoming sessions
+          const upcomingSessions = await Meeting.countDocuments({
+            counselorId: userId,
+            status: { $in: ['confirmed', 'time_selected', 'counselor_assigned'] },
+            meetingDate: { $gte: new Date() }
+          });
+          
+          if (upcomingSessions > 0) {
+            return next(
+              new ErrorHandler(
+                "Cannot delete account with upcoming sessions. Please complete or cancel all scheduled sessions first.",
+                400
+              )
+            );
+          }
+        }
+  
   
         // Perform role-specific cleanup
         switch (user.role) {

@@ -1,8 +1,6 @@
-// types/express-session.d.ts
 import 'express-session';
 import { Types } from 'mongoose';
 
-// Augment express-session with custom properties
 declare module 'express-session' {
   interface SessionData {
     userId: string;

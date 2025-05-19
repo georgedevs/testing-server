@@ -1,9 +1,7 @@
-// socketServer.ts
 import { Server as SocketIOServer } from 'socket.io';
 import http from 'http';
 import session from 'express-session';
 import { sessionConfig } from './utils/sessionStore';
-import { Server } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { redis } from './utils/redis';
 

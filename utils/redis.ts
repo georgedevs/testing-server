@@ -1,7 +1,10 @@
 import { Redis } from 'ioredis';
 import dotenv from 'dotenv';
+import { EventEmitter } from 'events';
 
 dotenv.config();
+
+EventEmitter.defaultMaxListeners = 20;
 
 const redisClient = () => {
     if (process.env.REDIS_URL) {
@@ -12,3 +15,6 @@ const redisClient = () => {
 };
 
 export const redis = new Redis(redisClient());
+
+
+redis.setMaxListeners(20);

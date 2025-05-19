@@ -1,4 +1,3 @@
-// app.ts (UPDATED)
 import express, { NextFunction, Request, Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -9,14 +8,9 @@ import bookingRouter from "./routes/bookingRoute";
 import sessionRouter from "./routes/sessionRoute";
 import expressSession from "express-session";
 import { sessionConfig } from "./utils/sessionStore";
-import helmet from "helmet";
+import helmet from "helmet";  
 
 export const app = express();
-
-const allowedOrigins = [
-  'https://micounselor.vercel.app',
-  // Add development origins if needed
-];
 
 // Security headers
 app.use(helmet());
@@ -38,7 +32,6 @@ const corsOptions = {
   origin: function(origin:any, callback:any) {
     const allowedOrigins = [
       'https://micounselor.vercel.app', 
-      // Add development origins if needed
       'http://localhost:3000'
     ];
     
@@ -51,7 +44,7 @@ const corsOptions = {
     }
     return callback(null, true);
   },
-  credentials: true, // IMPORTANT: needed for cookies to be sent with requests
+  credentials: true, 
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'X-Requested-With', 'device-id'],
 };
@@ -59,7 +52,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 // Security headers
 app.use((req, res, next) => {
-  res.setHeader('Permissions-Policy', 'interest-cohort=()'); // Opt out of FLoC
+  res.setHeader('Permissions-Policy', 'interest-cohort=()'); 
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
