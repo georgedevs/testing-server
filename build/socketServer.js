@@ -4,7 +4,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initSocketEvents = exports.initSocketServer = void 0;
-// socketServer.ts
 const socket_io_1 = require("socket.io");
 const express_session_1 = __importDefault(require("express-session"));
 const sessionStore_1 = require("./utils/sessionStore");

@@ -16,7 +16,6 @@ const catchAsyncErrors_1 = require("../middleware/catchAsyncErrors");
 const dailyService_1 = require("../utils/dailyService");
 const mongoose_1 = __importDefault(require("mongoose"));
 // 1. Initial Meeting Request   
-// 1. Initial Meeting Request   
 exports.initiateBooking = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
     try {
         const { meetingType, issueDescription, usePreviousCounselor = false } = req.body;

@@ -4,7 +4,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.app = void 0;
-// app.ts (UPDATED)
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
@@ -17,10 +16,6 @@ const express_session_1 = __importDefault(require("express-session"));
 const sessionStore_1 = require("./utils/sessionStore");
 const helmet_1 = __importDefault(require("helmet"));
 exports.app = (0, express_1.default)();
-const allowedOrigins = [
-    'https://micounselor.vercel.app',
-    // Add development origins if needed
-];
 // Security headers
 exports.app.use((0, helmet_1.default)());
 // Body parser
@@ -36,7 +31,6 @@ const corsOptions = {
     origin: function (origin, callback) {
         const allowedOrigins = [
             'https://micounselor.vercel.app',
-            // Add development origins if needed
             'http://localhost:3000'
         ];
         // Allow requests with no origin (like mobile apps or curl requests)
@@ -48,14 +42,14 @@ const corsOptions = {
         }
         return callback(null, true);
     },
-    credentials: true, // IMPORTANT: needed for cookies to be sent with requests
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'X-Requested-With', 'device-id'],
 };
 exports.app.use((0, cors_1.default)(corsOptions));
 // Security headers
 exports.app.use((req, res, next) => {
-    res.setHeader('Permissions-Policy', 'interest-cohort=()'); // Opt out of FLoC
+    res.setHeader('Permissions-Policy', 'interest-cohort=()');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');

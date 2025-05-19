@@ -12,6 +12,7 @@ const sendMail_1 = __importDefault(require("../utils/sendMail"));
 const redis_1 = require("../utils/redis");
 const sessionManager_1 = require("../utils/sessionManager");
 const avatar_1 = require("../utils/avatar");
+const bookingModel_1 = require("../models/bookingModel");
 const getRedisKey = (userId) => {
     return userId.toString();
 };
@@ -412,9 +413,18 @@ const generateOTP = () => {
 exports.forgotPassword = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
     try {
         const { email } = req.body;
+        // Always respond with the same message whether the user exists or not
+        const standardResponse = {
+            success: true,
+            message: "If an account exists with this email, a password reset OTP has been sent."
+        };
+        // Only process further if user actually exists
         const user = await userModel_1.User.findOne({ email });
         if (!user) {
-            return next(new errorHandler_1.default("User not found", 404));
+            // For non-existent users, add a small delay to prevent timing attacks
+            await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
+            // Return the standard response without any token
+            return res.status(200).json(standardResponse);
         }
         // Generate OTP
         const otp = generateOTP();
@@ -431,15 +441,21 @@ exports.forgotPassword = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res
                 template: "reset-password.ejs",
                 data: { user: { email: user.email, otp } }
             });
-            res.status(200).json({
-                success: true,
-                message: "Password reset OTP sent to your email",
-                resetToken
-            });
+            if (process.env.NODE_ENV === 'development') {
+                return res.status(200).json({
+                    ...standardResponse,
+                    // Include resetToken for development purposes
+                    resetToken
+                });
+            }
+            else {
+                // In production, don't send the actual token
+                return res.status(200).json(standardResponse);
+            }
         }
         catch (error) {
             await redis_1.redis.del(resetKey);
-            return next(new errorHandler_1.default("Error sending reset email", 500));
+            return next(new errorHandler_1.default("Error sending password reset instructions", 500));
         }
     }
     catch (error) {
@@ -449,18 +465,57 @@ exports.forgotPassword = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res
 // Verify OTP and reset password
 exports.resetPassword = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
     try {
-        const { resetToken, newPassword } = req.body;
-        // Verify reset token
-        const decoded = jsonwebtoken_1.default.verify(resetToken, process.env.RESET_TOKEN_SECRET);
-        const user = await userModel_1.User.findOne({ email: decoded.email });
+        const { resetToken, newPassword, email, otp } = req.body;
+        // Make sure we have either a resetToken or an email+otp combo
+        if (!resetToken && (!email || !otp)) {
+            return next(new errorHandler_1.default("Invalid request parameters", 400));
+        }
+        let userEmail;
+        let userOtp;
+        // Handle both resetToken and direct email+otp flow
+        if (resetToken) {
+            // Verify reset token
+            try {
+                const decoded = jsonwebtoken_1.default.verify(resetToken, process.env.RESET_TOKEN_SECRET);
+                userEmail = decoded.email;
+                userOtp = decoded.otp;
+            }
+            catch (error) {
+                // Generic error message for security
+                return next(new errorHandler_1.default("Invalid or expired reset token", 400));
+            }
+        }
+        else {
+            // Direct email+otp flow
+            userEmail = email;
+            userOtp = otp;
+        }
+        // Find the user
+        const user = await userModel_1.User.findOne({ email: userEmail });
         if (!user) {
-            return next(new errorHandler_1.default("User not found", 404));
+            // For security, don't reveal that the user doesn't exist
+            // Add a small delay to prevent timing attacks
+            await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
+            return next(new errorHandler_1.default("Invalid or expired reset token", 400));
         }
         // Check if reset token exists in Redis
         const resetKey = `reset:${user._id}`;
         const storedToken = await redis_1.redis.get(resetKey);
-        if (!storedToken || storedToken !== resetToken) {
+        if (!storedToken) {
             return next(new errorHandler_1.default("Invalid or expired reset token", 400));
+        }
+        // Verify OTP if direct flow
+        if (!resetToken) {
+            try {
+                const decoded = jsonwebtoken_1.default.verify(storedToken, process.env.RESET_TOKEN_SECRET);
+                // Check if OTP matches
+                if (decoded.otp !== userOtp) {
+                    return next(new errorHandler_1.default("Invalid verification code", 400));
+                }
+            }
+            catch (error) {
+                return next(new errorHandler_1.default("Invalid or expired reset token", 400));
+            }
         }
         // Update password
         user.password = newPassword;
@@ -685,11 +740,31 @@ exports.deleteAccount = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res,
         if (!user) {
             return next(new errorHandler_1.default("User not found", 404));
         }
+        if (!password || password.trim() === "") {
+            return next(new errorHandler_1.default("Password is required to delete account", 400));
+        }
         // Verify password before proceeding with deletion
         if (password) {
             const isPasswordValid = await user.comparePassword(password);
             if (!isPasswordValid) {
                 return next(new errorHandler_1.default("Invalid password", 401));
+            }
+        }
+        if (user.role === "counselor") {
+            // Cast user to ICounselor type for counselor-specific properties
+            const counselorUser = await userModel_1.Counselor.findById(userId);
+            // Check for active clients
+            if (counselorUser.activeClients > 0) {
+                return next(new errorHandler_1.default("Cannot delete account with active clients. Please transfer or complete all active client relationships first.", 400));
+            }
+            // Check for upcoming sessions
+            const upcomingSessions = await bookingModel_1.Meeting.countDocuments({
+                counselorId: userId,
+                status: { $in: ['confirmed', 'time_selected', 'counselor_assigned'] },
+                meetingDate: { $gte: new Date() }
+            });
+            if (upcomingSessions > 0) {
+                return next(new errorHandler_1.default("Cannot delete account with upcoming sessions. Please complete or cancel all scheduled sessions first.", 400));
             }
         }
         // Perform role-specific cleanup

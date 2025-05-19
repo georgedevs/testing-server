@@ -9,6 +9,7 @@ const http_1 = __importDefault(require("http"));
 const app_1 = require("./app");
 const db_1 = __importDefault(require("./utils/db"));
 const socketServer_1 = require("./socketServer");
+const sessionCleanup_1 = require("./utils/sessionCleanup");
 const getCurrentTimeInfo = () => {
     const now = new Date();
     return {
@@ -33,4 +34,6 @@ server.listen(PORT, () => {
     console.log(`Server is connected with port ${PORT}`);
     console.log(`Server time info:`, timeInfo);
     (0, db_1.default)();
+    (0, sessionCleanup_1.initSessionCleanup)();
+    console.log('Starting cleanup job');
 });

@@ -9,6 +9,7 @@ const errorHandler_1 = __importDefault(require("../utils/errorHandler"));
 const sessionModel_1 = require("../models/sessionModel");
 const bookingModel_1 = require("../models/bookingModel");
 const twilioClient_1 = __importDefault(require("../utils/twilioClient"));
+//IF WE CHOOSE TO USE TWILIO 
 // Create session from confirmed meeting
 exports.createSession = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
     const { meetingId } = req.body;
